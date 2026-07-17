@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API } from '../api.js';
 
 const AuthContext = createContext(null);
 
@@ -19,7 +20,7 @@ export function AuthProvider({ children }) {
 
   // Step 1: Send OTP to email
   const sendOtp = async (email) => {
-    const res = await fetch('/api/auth/otp-send', {
+    const res = await fetch(`${API}/api/auth/otp-send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -31,7 +32,7 @@ export function AuthProvider({ children }) {
 
   // Step 2: Verify OTP and login
   const verifyOtp = async (email, code) => {
-    const res = await fetch('/api/auth/otp-verify', {
+    const res = await fetch(`${API}/api/auth/otp-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
@@ -48,7 +49,7 @@ export function AuthProvider({ children }) {
 
   // Password-only login for local development
   const loginAdmin = async (password) => {
-    const res = await fetch('/api/auth/admin-login', {
+    const res = await fetch(`${API}/api/auth/admin-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),

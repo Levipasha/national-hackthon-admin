@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { RefreshCw, Trash2, GitMerge, Users, School, ChevronDown } from 'lucide-react';
+import { API } from '../api.js';
 
 export default function Teams() {
   const { token } = useAuth();
@@ -15,7 +16,7 @@ export default function Teams() {
   const fetchTeams = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/teams', {
+      const res = await fetch(`${API}/api/admin/teams`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setTeams(await res.json());
@@ -28,7 +29,7 @@ export default function Teams() {
   const deleteTeam = async (id, name) => {
     if (!window.confirm(`Dissolve team "${name}"? All members will be unassigned.`)) return;
     try {
-      const res = await fetch(`/api/admin/teams/${id}`, {
+      const res = await fetch(`${API}/api/admin/teams/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -42,7 +43,7 @@ export default function Teams() {
     }
     setMerging(true); setMergeMsg('');
     try {
-      const res = await fetch('/api/admin/teams/merge', {
+      const res = await fetch(`${API}/api/admin/teams/merge`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ teamAId: mergeA, teamBId: mergeB })

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Plus, ToggleLeft, ToggleRight, Trash2, RefreshCw, Ticket, Check } from 'lucide-react';
+import { API } from '../api.js';
 
 const EMPTY_FORM = {
   code: '',
@@ -24,7 +25,7 @@ export default function Coupons() {
   const fetchCoupons = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/coupons', {
+      const res = await fetch(`${API}/api/admin/coupons`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setCoupons(await res.json());
@@ -39,7 +40,7 @@ export default function Coupons() {
     setFormError(''); setFormSuccess('');
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/coupons/create', {
+      const res = await fetch(`${API}/api/admin/coupons/create`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -62,7 +63,7 @@ export default function Coupons() {
 
   const toggleCoupon = async (id) => {
     try {
-      await fetch('/api/admin/coupons/toggle', {
+      await fetch(`${API}/api/admin/coupons/toggle`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ couponId: id }),

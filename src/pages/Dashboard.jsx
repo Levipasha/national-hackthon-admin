@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp } from 'lucide-react';
+import { API } from '../api.js';
 
 export default function Dashboard() {
   const { token } = useAuth();
@@ -10,7 +11,7 @@ export default function Dashboard() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/stats', {
+      const res = await fetch(`${API}/api/admin/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setStats(await res.json());

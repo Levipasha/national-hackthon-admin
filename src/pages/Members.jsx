@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Search, RefreshCw, Download, UserCheck, Users } from 'lucide-react';
+import { API } from '../api.js';
 
 export default function Members() {
   const { token } = useAuth();
@@ -12,7 +13,7 @@ export default function Members() {
   const fetchParticipants = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/participants?search=${encodeURIComponent(search)}`, {
+      const res = await fetch(`${API}/api/admin/participants?search=${encodeURIComponent(search)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) setParticipants(await res.json());
@@ -29,11 +30,11 @@ export default function Members() {
 
   const exportCSV = () => {
     const link = document.createElement('a');
-    link.href = `/api/admin/export-csv`;
+    link.href = `${API}/api/admin/export-csv`;
     link.setAttribute('download', 'participants.csv');
     link.setAttribute('data-token', token);
     // We need to do a fetch with auth header, so open via fetch blob
-    fetch('/api/admin/export-csv', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API}/api/admin/export-csv`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
@@ -45,7 +46,7 @@ export default function Members() {
 
   const checkIn = async (userId) => {
     try {
-      const res = await fetch('/api/admin/checkin', {
+      const res = await fetch(`${API}/api/admin/checkin`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
