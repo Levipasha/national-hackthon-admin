@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown
+  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown, Trash2
 } from 'lucide-react';
 import { API } from '../api.js';
 
@@ -20,6 +20,7 @@ export default function Members() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +92,48 @@ export default function Members() {
     } catch (e) { console.error(e); showNotification('Check-in error.', 'error'); }
   };
 
+  /* ─── Delete participant ─── */
+  const deleteUser = async (userId, name) => {
+    if (!window.confirm(`Are you sure you want to delete participant "${name}"? This action is permanent and will remove them from the database.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/api/admin/participants/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchParticipants();
+        showNotification(`Participant "${name}" deleted successfully.`);
+      } else {
+        const errData = await res.json();
+        showNotification(errData.message || 'Deletion failed.', 'error');
+      }
+    } catch (e) { console.error(e); showNotification('Deletion error.', 'error'); }
+  };
+
+  /* ─── Impersonate User / Open Dashboard ─── */
+  const impersonateUser = async (userId) => {
+    try {
+      const res = await fetch(`${API}/api/admin/impersonate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      if (res.ok) {
+        const { token: userToken } = await res.json();
+        // Open user dashboard in a new tab pointing to the client app (port 3000)
+        const clientUrl = window.location.protocol + '//' + window.location.hostname + ':3000';
+        window.open(`${clientUrl}/login?token=${userToken}`, '_blank');
+      } else {
+        showNotification('Failed to generate user login session.', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showNotification('Error launching user dashboard.', 'error');
+    }
+  };
+
   /* ─── Filtering & Sorting ─── */
   const filtered = participants
     .filter(p => {
@@ -101,6 +144,11 @@ export default function Members() {
     })
     .filter(p => collegeFilter === 'all' || p.college === collegeFilter)
     .filter(p => sizeFilter === 'all' || p.tshirtSize === sizeFilter)
+    .filter(p => {
+      if (typeFilter === 'teams') return !!p.teamName;
+      if (typeFilter === 'individual') return !p.teamName;
+      return true;
+    })
     .sort((a, b) => {
       if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
       if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
@@ -222,6 +270,20 @@ export default function Members() {
             </select>
           </div>
 
+          {/* Registration Type */}
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input select"
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 130 }}
+            >
+              <option value="all">All Types</option>
+              <option value="teams">Teams</option>
+              <option value="individual">Individual</option>
+            </select>
+          </div>
+
           {/* Sort */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>SORT BY:</span>
@@ -267,13 +329,29 @@ export default function Members() {
                 <th>Amount</th>
                 <th>Status</th>
                 <th>Check-In</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((p, idx) => (
                 <tr key={p.id}>
                   <td style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{idx + 1}</td>
-                  <td style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{p.name}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <div 
+                      onClick={() => impersonateUser(p.id)}
+                      onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                      onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                      style={{ 
+                        fontWeight: 600, 
+                        color: 'var(--text-primary)', 
+                        cursor: 'pointer',
+                        display: 'inline-block'
+                      }}
+                      title="Click to view user dashboard"
+                    >
+                      {p.name}
+                    </div>
+                  </td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{p.email}</td>
                   <td>{p.phone}</td>
                   <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.college}</td>
@@ -298,6 +376,27 @@ export default function Members() {
                     ) : (
                       <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Unpaid</span>
                     )}
+                  </td>
+                  <td>
+                    <button 
+                      className="btn btn-danger btn-sm" 
+                      onClick={() => deleteUser(p.id, p.name)}
+                      style={{ 
+                        background: '#ef4444', 
+                        color: '#fff', 
+                        border: 'none', 
+                        padding: '4px 8px', 
+                        borderRadius: 4, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 4, 
+                        cursor: 'pointer', 
+                        fontSize: 10,
+                        fontWeight: 600
+                      }}
+                    >
+                      <Trash2 size={11} />Delete
+                    </button>
                   </td>
                 </tr>
               ))}
