@@ -1,22 +1,50 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Search, RefreshCw, Download, UserCheck, Users } from 'lucide-react';
+import {
+  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown
+} from 'lucide-react';
 import { API } from '../api.js';
+
+const ALL_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Date Registered (Newest)' },
+  { value: 'oldest', label: 'Date Registered (Oldest)' },
+  { value: 'name_asc', label: 'Name A–Z' },
+  { value: 'name_desc', label: 'Name Z–A' },
+];
 
 export default function Members() {
   const { token } = useAuth();
   const [participants, setParticipants] = useState([]);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // all | paid | unpaid | checkedin
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [collegeFilter, setCollegeFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState(null);
 
+  const showNotification = (msg, type = 'success') => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  /* ─── Fetch participants ─── */
   const fetchParticipants = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/admin/participants?search=${encodeURIComponent(search)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) setParticipants(await res.json());
+      const res = await fetch(
+        `${API}/api/admin/participants?search=${encodeURIComponent(search)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setParticipants(data);
+        // Derive unique colleges
+        const uniqueColleges = [...new Set(data.map(p => p.college).filter(Boolean))].sort();
+        setColleges(uniqueColleges);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [token, search]);
@@ -28,22 +56,25 @@ export default function Members() {
     }
   }, [token, search, fetchParticipants]);
 
+  /* ─── Export CSV ─── */
   const exportCSV = () => {
-    const link = document.createElement('a');
-    link.href = `${API}/api/admin/export-csv`;
-    link.setAttribute('download', 'participants.csv');
-    link.setAttribute('data-token', token);
-    // We need to do a fetch with auth header, so open via fetch blob
     fetch(`${API}/api/admin/export-csv`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob())
       .then(blob => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'participants.csv'; a.click();
+        a.href = url;
+        a.download = `registrations_report_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
         URL.revokeObjectURL(url);
+        showNotification('CSV Exported successfully!');
       });
   };
 
+  /* ─── Export PDF (print) ─── */
+  const exportPDF = () => window.print();
+
+  /* ─── Manual check-in ─── */
   const checkIn = async (userId) => {
     try {
       const res = await fetch(`${API}/api/admin/checkin`, {
@@ -51,81 +82,174 @@ export default function Members() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
       });
-      if (res.ok) fetchParticipants();
-    } catch (e) { console.error(e); }
+      if (res.ok) {
+        fetchParticipants();
+        showNotification('Participant checked in!');
+      } else {
+        showNotification('Check-in failed.', 'error');
+      }
+    } catch (e) { console.error(e); showNotification('Check-in error.', 'error'); }
   };
 
-  const filtered = participants.filter(p => {
-    if (filter === 'paid')      return p.paymentStatus === 'paid';
-    if (filter === 'unpaid')    return p.paymentStatus !== 'paid';
-    if (filter === 'checkedin') return p.checkedIn;
-    return true;
-  });
+  /* ─── Filtering & Sorting ─── */
+  const filtered = participants
+    .filter(p => {
+      if (statusFilter === 'paid')      return p.paymentStatus === 'paid';
+      if (statusFilter === 'unpaid')    return p.paymentStatus !== 'paid';
+      if (statusFilter === 'checkedin') return p.checkedIn;
+      return true;
+    })
+    .filter(p => collegeFilter === 'all' || p.college === collegeFilter)
+    .filter(p => sizeFilter === 'all' || p.tshirtSize === sizeFilter)
+    .sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+      return 0;
+    });
 
   const statusBadge = (p) => {
-    if (p.checkedIn) return <span className="badge badge-success">Checked In</span>;
-    if (p.paymentStatus === 'paid') return <span className="badge badge-warning">Paid</span>;
-    return <span className="badge badge-danger">Unpaid</span>;
+    if (p.checkedIn)                    return <span className="badge badge-success">Checked In</span>;
+    if (p.paymentStatus === 'paid')     return <span className="badge badge-warning">Paid</span>;
+    return                                     <span className="badge badge-danger">Unpaid</span>;
+  };
+
+  const sizeBadge = (size) => {
+    if (!size) return <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>;
+    return (
+      <span style={{
+        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+        background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)',
+        border: '1px solid var(--border-strong)', fontFamily: 'JetBrains Mono, monospace'
+      }}>
+        {size}
+      </span>
+    );
   };
 
   return (
     <div>
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="section-header">
         <div>
-          <div className="section-title">Members Monitor</div>
-          <div className="section-sub">{filtered.length} participants shown</div>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FileText size={18} style={{ color: 'var(--text-muted)' }} />
+            Registrations Ledger
+          </div>
+          <div className="section-sub">
+            Review pending student enrollments, manage approvals, and export conference rosters.
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost" onClick={fetchParticipants} disabled={loading}>
             <RefreshCw size={13} />Refresh
           </button>
-          <button className="btn btn-ghost" onClick={exportCSV}>
+          <button className="btn btn-ghost" onClick={exportCSV} title="Export CSV">
             <Download size={13} />Export CSV
+          </button>
+          <button className="btn btn-ghost" onClick={exportPDF} title="Export PDF" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <FileText size={13} />Export PDF
           </button>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Search */}
-        <div className="search-wrap" style={{ flex: 1, minWidth: 200 }}>
+      {notification && (
+        <div style={{
+          padding: '10px 16px', marginBottom: 16, borderRadius: 8,
+          background: notification.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          color: notification.type === 'success' ? '#16a34a' : '#dc2626',
+          border: `1px solid ${notification.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          fontSize: 12, fontWeight: 600
+        }}>
+          {notification.msg}
+        </div>
+      )}
+
+      {/* ── Search + Filters ── */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        {/* Search bar */}
+        <div className="search-wrap" style={{ marginBottom: 14 }}>
           <Search size={13} />
           <input
             className="input"
-            placeholder="Search name, email, college…"
+            placeholder="Search by Team Name or Registrant Email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
 
-        {/* Filter Tabs */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { key: 'all',       label: 'All' },
-            { key: 'paid',      label: 'Paid' },
-            { key: 'unpaid',    label: 'Unpaid' },
-            { key: 'checkedin', label: 'Checked In' },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              className={`btn btn-sm ${filter === key ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setFilter(key)}
+        {/* Filter dropdowns row */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Status */}
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input select"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 130 }}
             >
-              {label}
-            </button>
-          ))}
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="checkedin">Checked In</option>
+            </select>
+          </div>
+
+          {/* College */}
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input select"
+              value={collegeFilter}
+              onChange={e => setCollegeFilter(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 150 }}
+            >
+              <option value="all">All Colleges</option>
+              {colleges.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* T-shirt size */}
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input select"
+              value={sizeFilter}
+              onChange={e => setSizeFilter(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 120 }}
+            >
+              <option value="all">All Sizes</option>
+              {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Sort */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>SORT BY:</span>
+            <select
+              className="input select"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 200 }}
+            >
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Result count */}
+        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
+          Showing <strong style={{ color: 'var(--text-secondary)' }}>{filtered.length}</strong> of <strong style={{ color: 'var(--text-secondary)' }}>{participants.length}</strong> registrations
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       {loading ? (
-        <div className="loading-center"><div className="spinner" />Loading participants…</div>
+        <div className="loading-center"><div className="spinner" />Loading registrations…</div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          <Users size={40} />
-          <h3>No Participants Found</h3>
-          <p>Try adjusting your search or filter.</p>
+          <Filter size={40} />
+          <h3>No Registrations Found</h3>
+          <p>Try adjusting your search or filter criteria.</p>
         </div>
       ) : (
         <div className="table-wrap">
@@ -137,8 +261,9 @@ export default function Members() {
                 <th>Email</th>
                 <th>Phone</th>
                 <th>College</th>
-                <th>Branch / Year</th>
+                <th>Branch · Year</th>
                 <th>Team</th>
+                <th>T-Shirt</th>
                 <th>Amount</th>
                 <th>Status</th>
                 <th>Check-In</th>
@@ -151,13 +276,14 @@ export default function Members() {
                   <td style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{p.name}</td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{p.email}</td>
                   <td>{p.phone}</td>
-                  <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.college}</td>
+                  <td style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.college}</td>
                   <td>{p.branch} · {p.year}</td>
                   <td>
-                    {p.teamId
-                      ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-muted)' }}>{p.teamId}</span>
+                    {p.teamName
+                      ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-secondary)' }}>{p.teamName}</span>
                       : <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>}
                   </td>
+                  <td>{sizeBadge(p.tshirtSize)}</td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace' }}>
                     {p.amountPaid ? `₹${p.amountPaid}` : '—'}
                   </td>
@@ -179,6 +305,18 @@ export default function Members() {
           </table>
         </div>
       )}
+
+      {/* ── Print styles ── */}
+      <style>{`
+        @media print {
+          .sidebar, .topbar, .section-header .btn, .btn { display: none !important; }
+          .page-body { padding: 0 !important; }
+          .card { border: 1px solid #ddd !important; box-shadow: none !important; }
+          body { background: white !important; color: black !important; }
+          table th, table td { color: black !important; border-color: #ccc !important; }
+          .table-wrap { overflow: visible !important; }
+        }
+      `}</style>
     </div>
   );
 }

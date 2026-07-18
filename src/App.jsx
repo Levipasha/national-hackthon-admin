@@ -4,17 +4,32 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import Teams from './pages/Teams.jsx';
 import Members from './pages/Members.jsx';
 import Timeline from './pages/Timeline.jsx';
 import Coupons from './pages/Coupons.jsx';
+import Teams from './pages/Teams.jsx';
+import Broadcast from './pages/Broadcast.jsx';
+import Highlights from './pages/Highlights.jsx';
+import Guests from './pages/Guests.jsx';
+import Coordinators from './pages/Coordinators.jsx';
+import Profile from './pages/Profile.jsx';
+import Colleges from './pages/Colleges.jsx';
+import ProblemStatements from './pages/ProblemStatements.jsx';
 
 const PAGE_TITLES = {
-  '/':         { title: 'Overview Dashboard', sub: 'Live registration stats' },
-  '/teams':    { title: 'Teams Monitor',       sub: 'All registered teams' },
-  '/members':  { title: 'Members Monitor',     sub: 'Participant management' },
-  '/timeline': { title: 'Event Timeline',      sub: 'Deadlines & schedule' },
-  '/coupons':  { title: 'Coupon Manager',      sub: 'Discount code management' },
+  '/':             { title: 'Analytics Dashboard',  sub: 'Live registration stats & analytics' },
+  '/registrations':{ title: 'Registrations Ledger',  sub: 'Review pending student enrollments and manage approvals' },
+  '/broadcast':    { title: 'WS Broadcast',          sub: 'Dispatch real-time notifications to all attendees' },
+  '/highlights':   { title: 'Highlights Manager',    sub: 'Manage event highlights and media' },
+  '/guests':       { title: 'Guests Manager',        sub: 'Manage guest speakers and VIP attendees' },
+  '/timeline':     { title: 'Timeline Stages',       sub: 'Deadlines & schedule management' },
+  '/coordinators': { title: 'Coordinators',          sub: 'Faculty and student coordinator management' },
+  '/colleges':     { title: 'Colleges List',         sub: 'Manage colleges for the registration dropdown' },
+  '/problems':     { title: 'Problem Statements',    sub: 'Manage and distribute problem statements' },
+  '/profile':      { title: 'Profile Settings',      sub: 'Admin account and preferences' },
+  // Legacy redirects
+  '/teams':        { title: 'Teams Monitor',         sub: 'All registered teams' },
+  '/coupons':      { title: 'Coupon Manager',        sub: 'Discount code management' },
 };
 
 function Topbar() {
@@ -47,12 +62,20 @@ function ProtectedLayout() {
         <Topbar />
         <div className="page-body">
           <Routes>
-            <Route path="/"         element={<Dashboard />} />
-            <Route path="/teams"    element={<Teams />} />
-            <Route path="/members"  element={<Members />} />
-            <Route path="/timeline" element={<Timeline />} />
-            <Route path="/coupons"  element={<Coupons />} />
-            <Route path="*"         element={<Navigate to="/" replace />} />
+            <Route path="/"             element={<Dashboard />} />
+            <Route path="/registrations"element={<Members />} />
+            <Route path="/broadcast"    element={<Broadcast />} />
+            <Route path="/highlights"   element={<Highlights />} />
+            <Route path="/guests"       element={<Guests />} />
+            <Route path="/timeline"     element={<Timeline />} />
+            <Route path="/coordinators" element={<Coordinators />} />
+            <Route path="/colleges"     element={<Colleges />} />
+            <Route path="/problems"     element={<ProblemStatements />} />
+            <Route path="/profile"      element={<Profile />} />
+            {/* Legacy routes */}
+            <Route path="/teams"        element={<Teams />} />
+            <Route path="/coupons"      element={<Coupons />} />
+            <Route path="*"             element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>

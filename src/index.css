@@ -433,7 +433,8 @@ tbody td {
 /* ---- Search Bar ---- */
 .search-wrap {
   position: relative;
-  width: 280px;
+  flex: 1;
+  min-width: 200px;
 }
 .search-wrap svg {
   position: absolute;
@@ -657,7 +658,8 @@ tbody td {
 /* ---- Login Page ---- */
 .login-page {
   min-height: 100vh;
-  background: var(--bg-base);
+  background: url('/login-bg.jpg') no-repeat center center;
+  background-size: cover;
   display: flex;
   align-items: center;
   justify-content: center;

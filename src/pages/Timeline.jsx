@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, CalendarClock, Check, X, GripVertical } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 
-const STORAGE_KEY = 'dt_admin_timeline';
+import { API } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_EVENTS = [
   {
@@ -64,21 +65,32 @@ function getStatus(date, time) {
 const EMPTY_FORM = { title: '', date: '', time: '09:00', description: '', category: 'event' };
 
 export default function Timeline() {
-  const [events, setEvents] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : DEFAULT_EVENTS;
-    } catch { return DEFAULT_EVENTS; }
-  });
-
+  const { token } = useAuth();
+  const [events, setEvents] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId]     = useState(null);
   const [form, setForm]         = useState(EMPTY_FORM);
 
-  // Persist to localStorage whenever events change
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-  }, [events]);
+    fetchTimeline();
+  }, []);
+
+  const fetchTimeline = async () => {
+    try {
+      const res = await fetch(`${API}/api/timeline`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length === 0) {
+          // Auto-seed if empty
+          await resetToDefault();
+        } else {
+          setEvents(data);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const sorted = [...events].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
@@ -94,26 +106,65 @@ export default function Timeline() {
     setShowForm(true);
   };
 
-  const saveEvent = () => {
+  const saveEvent = async () => {
     if (!form.title || !form.date) return;
-    if (editId) {
-      setEvents(prev => prev.map(e => e.id === editId ? { ...e, ...form } : e));
-    } else {
-      setEvents(prev => [...prev, { id: Date.now().toString(), ...form }]);
+    try {
+      if (editId) {
+        const res = await fetch(`${API}/api/admin/timeline/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form)
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          setEvents(prev => prev.map(e => e.id === editId ? updated : e));
+        }
+      } else {
+        const res = await fetch(`${API}/api/admin/timeline`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form)
+        });
+        if (res.ok) {
+          const created = await res.json();
+          setEvents(prev => [...prev, created]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
     }
     setShowForm(false);
     setEditId(null);
     setForm(EMPTY_FORM);
   };
 
-  const deleteEvent = (id) => {
+  const deleteEvent = async (id) => {
     if (!window.confirm('Remove this timeline event?')) return;
-    setEvents(prev => prev.filter(e => e.id !== id));
+    try {
+      await fetch(`${API}/api/admin/timeline/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEvents(prev => prev.filter(e => e.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const resetToDefault = () => {
+  const resetToDefault = async () => {
     if (!window.confirm('Reset timeline to default events? This cannot be undone.')) return;
-    setEvents(DEFAULT_EVENTS);
+    try {
+      const res = await fetch(`${API}/api/admin/timeline/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ events: DEFAULT_EVENTS.map(({id, ...rest}) => rest) })
+      });
+      if (res.ok) {
+        setEvents(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (

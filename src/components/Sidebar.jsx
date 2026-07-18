@@ -2,16 +2,22 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  LayoutDashboard, Users, GitBranch, CalendarClock,
-  Ticket, LogOut, Shield
+  LayoutDashboard, CalendarClock, Ticket,
+  LogOut, Shield, Radio, Sparkles, UserCheck,
+  Award, Settings, ClipboardList, Users, School, Target
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/',        icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/teams',   icon: GitBranch,       label: 'Teams Monitor' },
-  { to: '/members', icon: Users,           label: 'Members Monitor' },
-  { to: '/timeline',icon: CalendarClock,   label: 'Timeline' },
-  { to: '/coupons', icon: Ticket,          label: 'Coupon Manager' },
+  { to: '/',             icon: LayoutDashboard, label: 'Analytics Dashboard' },
+  { to: '/registrations',icon: ClipboardList,   label: 'Registrations' },
+  { to: '/problems',     icon: Target,          label: 'Problem Statements' },
+  { to: '/broadcast',    icon: Radio,           label: 'WS Broadcast' },
+  { to: '/highlights',   icon: Sparkles,        label: 'Highlights Manager' },
+  { to: '/guests',       icon: UserCheck,       label: 'Guests Manager' },
+  { to: '/timeline',     icon: CalendarClock,   label: 'Timeline Stages' },
+  { to: '/coordinators', icon: Award,           label: 'Coordinators' },
+  { to: '/colleges',     icon: School,          label: 'Colleges List' },
+  { to: '/profile',      icon: Settings,        label: 'Profile Settings' },
 ];
 
 export default function Sidebar() {
@@ -31,8 +37,8 @@ export default function Sidebar() {
           <Shield size={14} color="black" />
         </div>
         <div>
-          <div className="sidebar-logo-text">CodeSprint</div>
-          <div className="sidebar-logo-sub">Admin Panel</div>
+          <div className="sidebar-logo-text">ADMIN CONTROL</div>
+          <div className="sidebar-logo-sub">CodeSprint 2026</div>
         </div>
       </div>
 
