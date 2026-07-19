@@ -6,7 +6,6 @@ import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Members from './pages/Members.jsx';
 import Timeline from './pages/Timeline.jsx';
-import Coupons from './pages/Coupons.jsx';
 import Teams from './pages/Teams.jsx';
 import Broadcast from './pages/Broadcast.jsx';
 import Highlights from './pages/Highlights.jsx';
@@ -29,7 +28,6 @@ const PAGE_TITLES = {
   '/profile':      { title: 'Profile Settings',      sub: 'Admin account and preferences' },
   // Legacy redirects
   '/teams':        { title: 'Teams Monitor',         sub: 'All registered teams' },
-  '/coupons':      { title: 'Coupon Manager',        sub: 'Discount code management' },
 };
 
 function Topbar() {
@@ -74,7 +72,6 @@ function ProtectedLayout() {
             <Route path="/profile"      element={<Profile />} />
             {/* Legacy routes */}
             <Route path="/teams"        element={<Teams />} />
-            <Route path="/coupons"      element={<Coupons />} />
             <Route path="*"             element={<Navigate to="/" replace />} />
           </Routes>
         </div>

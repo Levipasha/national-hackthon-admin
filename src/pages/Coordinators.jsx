@@ -93,7 +93,10 @@ export default function Coordinators() {
     setEditingId(null);
   };
 
-  const facultyCoords = coordinators.filter(c => c.role.toLowerCase().includes('faculty') || c.role.toLowerCase().includes('dean') || c.role.toLowerCase().includes('professor'));
+  const facultyCoords = coordinators.filter(c => {
+    const roleLower = (c.role || '').toLowerCase();
+    return roleLower.includes('faculty') || roleLower.includes('dean') || roleLower.includes('professor');
+  });
   const studentCoords = coordinators.filter(c => !facultyCoords.includes(c));
 
   return (
@@ -137,23 +140,23 @@ export default function Coordinators() {
               </div>
               <div className="input-group">
                 <label className="label">Role</label>
-                <input required className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value})} placeholder="e.g. Faculty Coordinator" />
+                <input className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value})} placeholder="e.g. Faculty Coordinator" />
               </div>
               <div className="input-group">
                 <label className="label">Department / Info</label>
-                <input required className="input" value={form.dept} onChange={e => setForm({...form, dept: e.target.value})} placeholder="e.g. CSE Dept" />
+                <input className="input" value={form.dept} onChange={e => setForm({...form, dept: e.target.value})} placeholder="e.g. CSE Dept" />
               </div>
               <div className="input-group">
                 <label className="label">Initials (Avatar)</label>
-                <input required className="input" value={form.avatar} onChange={e => setForm({...form, avatar: e.target.value})} placeholder="e.g. JD" maxLength={3} />
+                <input className="input" value={form.avatar} onChange={e => setForm({...form, avatar: e.target.value})} placeholder="e.g. JD" maxLength={3} />
               </div>
               <div className="input-group">
                 <label className="label">Email</label>
-                <input required type="email" className="input" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                <input type="email" className="input" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
               </div>
               <div className="input-group">
                 <label className="label">Phone</label>
-                <input required className="input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                <input className="input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
               </div>
               <div className="input-group">
                 <label className="label">Theme Color</label>
@@ -199,6 +202,9 @@ export default function Coordinators() {
 }
 
 function CoordinatorCard({ c, onEdit, onDelete }) {
+  const avatarText = c.avatar || (c.name || '').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || '??';
+  const displayColor = c.color || '#3b82f6';
+  
   return (
     <div className="card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start', position: 'relative' }}>
       <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6 }}>
@@ -209,23 +215,27 @@ function CoordinatorCard({ c, onEdit, onDelete }) {
       {/* Avatar */}
       <div style={{
         width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-        background: `${c.color}22`, border: `2px solid ${c.color}55`,
+        background: `${displayColor}22`, border: `2px solid ${displayColor}55`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, fontWeight: 800, color: c.color, letterSpacing: 1
+        fontSize: 14, fontWeight: 800, color: displayColor, letterSpacing: 1
       }}>
-        {c.avatar}
+        {avatarText}
       </div>
       <div style={{ flex: 1, minWidth: 0, paddingRight: 40 }}>
         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13, marginBottom: 2 }}>{c.name}</div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: c.color, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>{c.role}</div>
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>{c.dept}</div>
+        {c.role && <div style={{ fontSize: 10, fontWeight: 600, color: displayColor, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>{c.role}</div>}
+        {c.dept && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>{c.dept}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Mail size={9} />{c.email}
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Phone size={9} />{c.phone}
-          </span>
+          {c.email && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Mail size={9} />{c.email}
+            </span>
+          )}
+          {c.phone && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Phone size={9} />{c.phone}
+            </span>
+          )}
         </div>
       </div>
     </div>

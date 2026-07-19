@@ -92,6 +92,28 @@ export default function Members() {
     } catch (e) { console.error(e); showNotification('Check-in error.', 'error'); }
   };
 
+  /* ─── Verify UTR Payment Request ─── */
+  const verifyUtr = async (userId, action) => {
+    if (!window.confirm(`Are you sure you want to ${action} this payment request?`)) return;
+    try {
+      const res = await fetch(`${API}/api/admin/verify-utr`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action })
+      });
+      if (res.ok) {
+        fetchParticipants();
+        showNotification(`Payment successfully ${action}d!`);
+      } else {
+        const errData = await res.json();
+        showNotification(errData.message || 'Verification update failed.', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showNotification('Verification update error.', 'error');
+    }
+  };
+
   /* ─── Delete participant ─── */
   const deleteUser = async (userId, name) => {
     if (!window.confirm(`Are you sure you want to delete participant "${name}"? This action is permanent and will remove them from the database.`)) {
@@ -138,6 +160,8 @@ export default function Members() {
   const filtered = participants
     .filter(p => {
       if (statusFilter === 'paid')      return p.paymentStatus === 'paid';
+      if (statusFilter === 'submitted') return p.paymentStatus === 'submitted';
+      if (statusFilter === 'rejected')  return p.paymentStatus === 'rejected';
       if (statusFilter === 'unpaid')    return p.paymentStatus !== 'paid';
       if (statusFilter === 'checkedin') return p.checkedIn;
       return true;
@@ -160,6 +184,8 @@ export default function Members() {
   const statusBadge = (p) => {
     if (p.checkedIn)                    return <span className="badge badge-success">Checked In</span>;
     if (p.paymentStatus === 'paid')     return <span className="badge badge-warning">Paid</span>;
+    if (p.paymentStatus === 'submitted') return <span className="badge badge-info" style={{ backgroundColor: '#3b82f6', color: '#fff' }}>Pending Verification</span>;
+    if (p.paymentStatus === 'rejected')  return <span className="badge badge-danger" style={{ backgroundColor: '#ef4444', color: '#fff' }}>Rejected</span>;
     return                                     <span className="badge badge-danger">Unpaid</span>;
   };
 
@@ -239,6 +265,8 @@ export default function Members() {
             >
               <option value="all">All Statuses</option>
               <option value="paid">Paid</option>
+              <option value="submitted">Pending Verification</option>
+              <option value="rejected">Rejected</option>
               <option value="unpaid">Unpaid</option>
               <option value="checkedin">Checked In</option>
             </select>
@@ -328,6 +356,7 @@ export default function Members() {
                 <th>T-Shirt</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>UTR Number</th>
                 <th>Check-In</th>
                 <th>Actions</th>
               </tr>
@@ -363,9 +392,16 @@ export default function Members() {
                   </td>
                   <td>{sizeBadge(p.tshirtSize)}</td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                    {p.amountPaid ? `₹${p.amountPaid}` : '—'}
+                    {p.amountPaid ? `₹${p.amountPaid}` : (p.expectedAmount ? `₹${p.expectedAmount}` : '—')}
                   </td>
                   <td>{statusBadge(p)}</td>
+                  <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                    {p.utr ? (
+                      <span style={{ color: '#a78bfa', fontWeight: 650 }}>{p.utr}</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
                   <td>
                     {!p.checkedIn && p.paymentStatus === 'paid' ? (
                       <button className="btn btn-success btn-sm" onClick={() => checkIn(p.id)}>
@@ -378,25 +414,63 @@ export default function Members() {
                     )}
                   </td>
                   <td>
-                    <button 
-                      className="btn btn-danger btn-sm" 
-                      onClick={() => deleteUser(p.id, p.name)}
-                      style={{ 
-                        background: '#ef4444', 
-                        color: '#fff', 
-                        border: 'none', 
-                        padding: '4px 8px', 
-                        borderRadius: 4, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 4, 
-                        cursor: 'pointer', 
-                        fontSize: 10,
-                        fontWeight: 600
-                      }}
-                    >
-                      <Trash2 size={11} />Delete
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {p.paymentStatus === 'submitted' && (
+                        <>
+                          <button 
+                            className="btn btn-success btn-sm" 
+                            onClick={() => verifyUtr(p.id, 'approve')}
+                            style={{ 
+                              background: '#22c55e', 
+                              color: '#fff', 
+                              border: 'none', 
+                              padding: '4px 8px', 
+                              borderRadius: 4, 
+                              cursor: 'pointer', 
+                              fontSize: 10,
+                              fontWeight: 650
+                            }}
+                          >
+                            Approve
+                          </button>
+                          <button 
+                            className="btn btn-danger btn-sm" 
+                            onClick={() => verifyUtr(p.id, 'reject')}
+                            style={{ 
+                              background: '#f97316', 
+                              color: '#fff', 
+                              border: 'none', 
+                              padding: '4px 8px', 
+                              borderRadius: 4, 
+                              cursor: 'pointer', 
+                              fontSize: 10,
+                              fontWeight: 655
+                            }}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      <button 
+                        className="btn btn-danger btn-sm" 
+                        onClick={() => deleteUser(p.id, p.name)}
+                        style={{ 
+                          background: '#ef4444', 
+                          color: '#fff', 
+                          border: 'none', 
+                          padding: '4px 8px', 
+                          borderRadius: 4, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 4, 
+                          cursor: 'pointer', 
+                          fontSize: 10,
+                          fontWeight: 600
+                        }}
+                      >
+                        <Trash2 size={11} />Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
