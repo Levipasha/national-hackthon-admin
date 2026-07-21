@@ -17,7 +17,6 @@ export default function Members() {
   const { token } = useAuth();
   const [participants, setParticipants] = useState([]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -158,14 +157,7 @@ export default function Members() {
 
   /* ─── Filtering & Sorting ─── */
   const filtered = participants
-    .filter(p => {
-      if (statusFilter === 'paid')      return p.paymentStatus === 'paid';
-      if (statusFilter === 'submitted') return p.paymentStatus === 'submitted';
-      if (statusFilter === 'rejected')  return p.paymentStatus === 'rejected';
-      if (statusFilter === 'unpaid')    return p.paymentStatus !== 'paid';
-      if (statusFilter === 'checkedin') return p.checkedIn;
-      return true;
-    })
+    .filter(p => p.paymentStatus === 'paid' || p.checkedIn)
     .filter(p => collegeFilter === 'all' || p.college === collegeFilter)
     .filter(p => sizeFilter === 'all' || p.tshirtSize === sizeFilter)
     .filter(p => {
@@ -255,23 +247,6 @@ export default function Members() {
 
         {/* Filter dropdowns row */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Status */}
-          <div style={{ position: 'relative' }}>
-            <select
-              className="input select"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 130 }}
-            >
-              <option value="all">All Statuses</option>
-              <option value="paid">Paid</option>
-              <option value="submitted">Pending Verification</option>
-              <option value="rejected">Rejected</option>
-              <option value="unpaid">Unpaid</option>
-              <option value="checkedin">Checked In</option>
-            </select>
-          </div>
-
           {/* College */}
           <div style={{ position: 'relative' }}>
             <select
@@ -356,7 +331,7 @@ export default function Members() {
                 <th>T-Shirt</th>
                 <th>Amount</th>
                 <th>Status</th>
-                <th>UTR Number</th>
+                <th>Payment ID</th>
                 <th>Check-In</th>
                 <th>Actions</th>
               </tr>
@@ -396,8 +371,8 @@ export default function Members() {
                   </td>
                   <td>{statusBadge(p)}</td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
-                    {p.utr ? (
-                      <span style={{ color: '#a78bfa', fontWeight: 650 }}>{p.utr}</span>
+                    {p.paymentId ? (
+                      <span style={{ color: '#a78bfa', fontWeight: 650 }}>{p.paymentId}</span>
                     ) : (
                       <span style={{ color: 'var(--text-muted)' }}>—</span>
                     )}
@@ -415,42 +390,6 @@ export default function Members() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      {p.paymentStatus === 'submitted' && (
-                        <>
-                          <button 
-                            className="btn btn-success btn-sm" 
-                            onClick={() => verifyUtr(p.id, 'approve')}
-                            style={{ 
-                              background: '#22c55e', 
-                              color: '#fff', 
-                              border: 'none', 
-                              padding: '4px 8px', 
-                              borderRadius: 4, 
-                              cursor: 'pointer', 
-                              fontSize: 10,
-                              fontWeight: 650
-                            }}
-                          >
-                            Approve
-                          </button>
-                          <button 
-                            className="btn btn-danger btn-sm" 
-                            onClick={() => verifyUtr(p.id, 'reject')}
-                            style={{ 
-                              background: '#f97316', 
-                              color: '#fff', 
-                              border: 'none', 
-                              padding: '4px 8px', 
-                              borderRadius: 4, 
-                              cursor: 'pointer', 
-                              fontSize: 10,
-                              fontWeight: 655
-                            }}
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
                       <button 
                         className="btn btn-danger btn-sm" 
                         onClick={() => deleteUser(p.id, p.name)}
@@ -479,15 +418,70 @@ export default function Members() {
         </div>
       )}
 
+      {/* ── Print-only detailed table (with the exact same fields as CSV) ── */}
+      <div className="print-only-table-wrap">
+        <h2 className="print-title" style={{ display: 'none', margin: '0 0 10px 0', fontSize: '16px', color: '#000' }}>Registrations Report</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>College</th>
+              <th>Branch</th>
+              <th>Year</th>
+              <th>Gender</th>
+              <th>T-Shirt</th>
+              <th>Team Name</th>
+              <th>Status</th>
+              <th>Paid</th>
+              <th>Checked In</th>
+              <th>Reg Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id}>
+                <td>{p.id}</td>
+                <td>{p.name}</td>
+                <td>{p.email}</td>
+                <td>{p.phone}</td>
+                <td>{p.college}</td>
+                <td>{p.branch}</td>
+                <td>{p.year}</td>
+                <td>{p.gender || '—'}</td>
+                <td>{p.tshirtSize || '—'}</td>
+                <td>{p.teamName || '—'}</td>
+                <td>{p.paymentStatus}</td>
+                <td>₹{p.amountPaid || p.expectedAmount || 0}</td>
+                <td>{p.checkedIn ? 'Yes' : 'No'}</td>
+                <td>{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN') : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {/* ── Print styles ── */}
       <style>{`
+        .print-only-table-wrap { display: none; }
         @media print {
-          .sidebar, .topbar, .section-header .btn, .btn { display: none !important; }
-          .page-body { padding: 0 !important; }
-          .card { border: 1px solid #ddd !important; box-shadow: none !important; }
+          .sidebar, .topbar, .section-header, .search-wrap, .card, .table-wrap, .btn { display: none !important; }
+          .page-body { padding: 0 !important; margin: 0 !important; }
           body { background: white !important; color: black !important; }
-          table th, table td { color: black !important; border-color: #ccc !important; }
-          .table-wrap { overflow: visible !important; }
+          .print-title { display: block !important; }
+          .print-only-table-wrap { display: block !important; }
+          .print-only-table-wrap table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          .print-only-table-wrap th, .print-only-table-wrap td { 
+            border: 1px solid #ccc !important; 
+            padding: 5px 6px !important; 
+            text-align: left !important; 
+            font-size: 8px !important; 
+            color: black !important;
+            word-break: break-all;
+          }
+          .print-only-table-wrap th { background: #f1f1f1 !important; font-weight: 700 !important; }
         }
       `}</style>
     </div>

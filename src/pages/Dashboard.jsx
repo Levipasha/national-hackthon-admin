@@ -25,7 +25,7 @@ export default function Dashboard() {
     { label: 'Total Registrations', value: stats.totalRegistrations ?? 0,   icon: Users,       sub: 'All registered participants' },
     { label: 'Paid Participants',   value: stats.paidParticipants ?? 0,     icon: CreditCard,  sub: `₹${(stats.totalRevenue ?? 0).toLocaleString()} collected` },
     { label: 'Checked In',          value: stats.checkedInCount ?? 0,       icon: UserCheck,   sub: 'At venue today' },
-    { label: 'Total Teams',         value: stats.totalTeams ?? 0,           icon: GitBranch,   sub: `${stats.availableSlots ?? 0} open slots remaining` },
+    { label: 'Total Teams',         value: stats.totalTeams ?? 0,           icon: GitBranch,   sub: 'Formed event teams' },
   ] : [];
 
   return (
@@ -94,8 +94,9 @@ export default function Dashboard() {
               {[
                 ['Total Revenue',    `₹${(stats.totalRevenue ?? 0).toLocaleString()}`],
                 ['Avg per Team',     stats.totalTeams > 0 ? `₹${Math.round((stats.totalRevenue ?? 0) / stats.totalTeams).toLocaleString()}` : '—'],
-                ['Seats Available',  stats.availableSlots ?? 0],
+                ['Pending Payments', stats.totalRegistrations - stats.paidParticipants],
               ].map(([k, v]) => (
+
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                   <span style={{ color: 'var(--text-muted)' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace' }}>{v}</span>
