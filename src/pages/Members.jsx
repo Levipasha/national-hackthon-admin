@@ -13,9 +13,28 @@ const SORT_OPTIONS = [
   { value: 'name_desc', label: 'Name Z–A' },
 ];
 
+const normalizeCollegeName = (name) => {
+  if (!name) return '';
+  let cleaned = name.trim().replace(/\s+/g, ' ');
+  cleaned = cleaned.replace(/instuite/gi, 'Institute');
+  cleaned = cleaned.replace(/instittue/gi, 'Institute');
+  cleaned = cleaned.replace(/intstitute/gi, 'Institute');
+  cleaned = cleaned.replace(/universty/gi, 'University');
+  cleaned = cleaned.replace(/univercity/gi, 'University');
+  return cleaned
+    .split(' ')
+    .map(word => {
+      const lower = word.toLowerCase();
+      if (['of', 'and', '&', 'for', 'in', 'at', 'the'].includes(lower)) return lower;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+};
+
 export default function Members() {
   const { token } = useAuth();
   const [participants, setParticipants] = useState([]);
+  const [stats, setStats] = useState(null);
   const [search, setSearch] = useState('');
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
@@ -30,7 +49,7 @@ export default function Members() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  /* ─── Fetch participants ─── */
+  /* ─── Fetch participants & stats ─── */
   const fetchParticipants = useCallback(async () => {
     setLoading(true);
     try {
@@ -41,9 +60,15 @@ export default function Members() {
       if (res.ok) {
         const data = await res.json();
         setParticipants(data);
-        // Derive unique colleges
-        const uniqueColleges = [...new Set(data.map(p => p.college).filter(Boolean))].sort();
+        // Derive unique normalized colleges
+        const uniqueColleges = [...new Set(data.map(p => normalizeCollegeName(p.college)).filter(Boolean))].sort();
         setColleges(uniqueColleges);
+      }
+      const statsRes = await fetch(`${API}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -332,7 +357,6 @@ export default function Members() {
                 <th>Amount</th>
                 <th>Status</th>
                 <th>Payment ID</th>
-                <th>Check-In</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -378,17 +402,6 @@ export default function Members() {
                     )}
                   </td>
                   <td>
-                    {!p.checkedIn && p.paymentStatus === 'paid' ? (
-                      <button className="btn btn-success btn-sm" onClick={() => checkIn(p.id)}>
-                        <UserCheck size={11} />Check In
-                      </button>
-                    ) : p.checkedIn ? (
-                      <span style={{ fontSize: 10, color: 'var(--success)' }}>✓ Done</span>
-                    ) : (
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Unpaid</span>
-                    )}
-                  </td>
-                  <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <button 
                         className="btn btn-danger btn-sm" 
@@ -418,72 +431,133 @@ export default function Members() {
         </div>
       )}
 
-      {/* ── Print-only detailed table (with the exact same fields as CSV) ── */}
-      <div className="print-only-table-wrap">
-        <h2 className="print-title" style={{ display: 'none', margin: '0 0 10px 0', fontSize: '16px', color: '#000' }}>Registrations Report</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>College</th>
-              <th>Branch</th>
-              <th>Year</th>
-              <th>Gender</th>
-              <th>T-Shirt</th>
-              <th>Team Name</th>
-              <th>Status</th>
-              <th>Paid</th>
-              <th>Checked In</th>
-              <th>Reg Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id}>
-                <td>{p.id}</td>
-                <td>{p.name}</td>
-                <td>{p.email}</td>
-                <td>{p.phone}</td>
-                <td>{p.college}</td>
-                <td>{p.branch}</td>
-                <td>{p.year}</td>
-                <td>{p.gender || '—'}</td>
-                <td>{p.tshirtSize || '—'}</td>
-                <td>{p.teamName || '—'}</td>
-                <td>{p.paymentStatus}</td>
-                <td>₹{p.amountPaid || p.expectedAmount || 0}</td>
-                <td>{p.checkedIn ? 'Yes' : 'No'}</td>
-                <td>{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN') : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* ── Printable PDF / Print Report Container ── */}
+      <div className="printable-report" style={{ background: '#ffffff', color: '#000000', padding: 0 }}>
+        <div style={{ textAlign: 'center', marginBottom: 16, borderBottom: '2px solid #000000', paddingBottom: 8 }}>
+          <h1 style={{ fontSize: 16, fontWeight: 'bold', margin: 0, textTransform: 'uppercase', color: '#000000' }}>
+            CodeSprint 2026 — Comprehensive Registration & Analytics Report
+          </h1>
+          <div style={{ fontSize: 10, color: '#333333', marginTop: 4 }}>
+            Generated on {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} • Total Filtered Records: {filtered.length}
+          </div>
+        </div>
 
-      {/* ── Print styles ── */}
-      <style>{`
-        .print-only-table-wrap { display: none; }
-        @media print {
-          .sidebar, .topbar, .section-header, .search-wrap, .card, .table-wrap, .btn { display: none !important; }
-          .page-body { padding: 0 !important; margin: 0 !important; }
-          body { background: white !important; color: black !important; }
-          .print-title { display: block !important; }
-          .print-only-table-wrap { display: block !important; }
-          .print-only-table-wrap table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          .print-only-table-wrap th, .print-only-table-wrap td { 
-            border: 1px solid #ccc !important; 
-            padding: 5px 6px !important; 
-            text-align: left !important; 
-            font-size: 8px !important; 
-            color: black !important;
-            word-break: break-all;
-          }
-          .print-only-table-wrap th { background: #f1f1f1 !important; font-weight: 700 !important; }
-        }
-      `}</style>
+        {/* SECTION 1: DAY-BY-DAY REGISTRATIONS */}
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 6, borderBottom: '1px solid #666666', paddingBottom: 3, color: '#000000' }}>
+            Section 1: Day-by-Day Student Registrations Breakdown
+          </h2>
+          {stats?.liveRegistrationsGraph && stats.liveRegistrationsGraph.length > 0 ? (
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '30%' }}>Date</th>
+                  <th style={{ width: '30%' }}>Registered Students Count</th>
+                  <th>Visual Count Indicator</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.liveRegistrationsGraph.map((item) => {
+                  const maxVal = Math.max(...stats.liveRegistrationsGraph.map(d => d.count), 1);
+                  const barWidth = Math.max((item.count / maxVal) * 100, item.count > 0 ? 8 : 0);
+                  return (
+                    <tr key={item.date}>
+                      <td style={{ fontWeight: 'bold', color: '#000000' }}>{item.date}</td>
+                      <td style={{ color: '#000000' }}>{item.count} Students</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className="print-bar" style={{ height: 10, width: `${barWidth}%`, backgroundColor: item.count > 0 ? '#2563eb' : '#e5e7eb', borderRadius: 2 }} />
+                          <span style={{ fontSize: 9, color: '#000000', fontWeight: 'bold' }}>{item.count}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ fontSize: 11, color: '#333333' }}>No registration date history recorded.</p>
+          )}
+        </div>
+
+        {/* SECTION 2: COLLEGE-WISE DISTRIBUTION */}
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 6, borderBottom: '1px solid #666666', paddingBottom: 3, color: '#000000' }}>
+            Section 2: College-wise Student Registration Distribution
+          </h2>
+          {stats?.collegeDistribution && Object.keys(stats.collegeDistribution).length > 0 ? (
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '10%' }}>#</th>
+                  <th>College Name</th>
+                  <th style={{ width: '30%' }}>Total Registered Students</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(stats.collegeDistribution)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([collegeName, count], idx) => (
+                    <tr key={collegeName}>
+                      <td style={{ color: '#000000' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: 'bold', color: '#000000' }}>{collegeName}</td>
+                      <td style={{ color: '#000000' }}>{count} Students</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ fontSize: 11, color: '#333333' }}>No college breakdown available.</p>
+          )}
+        </div>
+
+        {/* SECTION 3: ALL PARTICIPANTS LEDGER */}
+        <div>
+          <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 6, borderBottom: '1px solid #666666', paddingBottom: 3, color: '#000000' }}>
+            Section 3: All Participant Registration Records ({filtered.length})
+          </h2>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '4%' }}>#</th>
+                <th style={{ width: '13%' }}>Name</th>
+                <th style={{ width: '15%' }}>Email</th>
+                <th style={{ width: '9%' }}>Phone</th>
+                <th style={{ width: '16%' }}>College</th>
+                <th style={{ width: '13%' }}>Branch · Year</th>
+                <th style={{ width: '8%' }}>Team</th>
+                <th style={{ width: '5%' }}>Size</th>
+                <th style={{ width: '6%' }}>Amount</th>
+                <th style={{ width: '5%' }}>Status</th>
+                <th style={{ width: '11%' }}>Payment ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p, idx) => (
+                <tr key={p.id}>
+                  <td style={{ color: '#000000' }}>{idx + 1}</td>
+                  <td style={{ fontWeight: 'bold', color: '#000000' }}>{p.name}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: '8.5px', color: '#000000' }}>{p.email}</td>
+                  <td style={{ color: '#000000' }}>{p.phone}</td>
+                  <td style={{ color: '#000000' }}>{p.college}</td>
+                  <td style={{ color: '#000000' }}>{p.branch} · {p.year}</td>
+                  <td style={{ color: '#000000' }}>{p.teamName || '—'}</td>
+                  <td style={{ color: '#000000' }}>{p.tshirtSize || '—'}</td>
+                  <td style={{ fontWeight: 'bold', fontFamily: 'monospace', color: '#000000' }}>₹{p.amountPaid || p.expectedAmount || 0}</td>
+                  <td>
+                    <span className="print-badge-paid">
+                      {p.paymentStatus || 'paid'}
+                    </span>
+                  </td>
+                  <td className="print-payment-id" style={{ fontFamily: 'monospace', fontSize: '8px' }}>
+                    {p.paymentId || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

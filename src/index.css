@@ -739,3 +739,93 @@ tbody td {
   border-radius: 99px;
   transition: width 0.3s ease;
 }
+
+/* ---- Printable PDF Report Styles ---- */
+.printable-report {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  
+  html, body, #root, div, section, main, article, .layout, .main-content, .page-body, .printable-report {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+  }
+
+  .sidebar, .section-header, .search-wrap, .input, button, .pagination, .card, .table-wrap, .empty-state, .stat-card, header, nav, .btn {
+    display: none !important;
+  }
+
+  .printable-report {
+    display: block !important;
+    color: #000000 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+  }
+
+  .printable-report h1, 
+  .printable-report h2, 
+  .printable-report h3, 
+  .printable-report p, 
+  .printable-report div:not(.print-bar), 
+  .printable-report td, 
+  .printable-report th {
+    color: #000000 !important;
+  }
+
+  .printable-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 16px !important;
+    table-layout: auto !important;
+    background: #ffffff !important;
+  }
+
+  .printable-report th {
+    background-color: #f3f4f6 !important;
+    color: #000000 !important;
+    border: 1px solid #4b5563 !important;
+    padding: 5px 6px !important;
+    font-size: 8.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+  }
+
+  .printable-report td {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #9ca3af !important;
+    padding: 4px 6px !important;
+    font-size: 8.5px !important;
+    text-align: left !important;
+    word-break: break-word !important;
+  }
+
+  .printable-report .print-text-dark {
+    color: #000000 !important;
+  }
+
+  .printable-report .print-text-muted {
+    color: #374151 !important;
+  }
+
+  .printable-report .print-badge-paid {
+    color: #15803d !important;
+    font-weight: 700 !important;
+  }
+
+  .printable-report .print-payment-id {
+    color: #4c1d95 !important;
+    font-weight: 700 !important;
+  }
+}
