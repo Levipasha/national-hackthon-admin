@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp } from 'lucide-react';
+import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp, Globe, Eye, Monitor } from 'lucide-react';
 import { API } from '../api.js';
 
 export default function Dashboard() {
@@ -25,6 +25,7 @@ export default function Dashboard() {
     { label: 'Total Registrations', value: stats.totalRegistrations ?? 0,   icon: Users,       sub: 'All registered participants' },
     { label: 'Paid Participants',   value: stats.paidParticipants ?? 0,     icon: CreditCard,  sub: `₹${(stats.totalRevenue ?? 0).toLocaleString()} collected` },
     { label: 'Total Teams',         value: stats.totalTeams ?? 0,           icon: GitBranch,   sub: 'Formed event teams' },
+    { label: 'Unique Visitors',     value: stats.uniqueVisitorsCount ?? 0,  icon: Globe,       sub: 'Filtered by IP (no duplicate hits)' },
   ] : [];
 
   const graphData = stats?.liveRegistrationsGraph || [];
@@ -56,7 +57,7 @@ export default function Dashboard() {
       {loading ? (
         <div className="loading-center"><div className="spinner" /> Loading stats…</div>
       ) : (
-        <div className="grid-3" style={{ marginBottom: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 28 }}>
           {cards.map(({ label, value, icon: Icon, sub }) => (
             <div key={label} className="stat-card">
               <div className="stat-icon"><Icon size={16} /></div>
