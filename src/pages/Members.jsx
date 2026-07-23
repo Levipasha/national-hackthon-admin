@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown, Trash2
+  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown, Trash2, Check, X
 } from 'lucide-react';
 import { API } from '../api.js';
 
@@ -39,6 +39,7 @@ export default function Members() {
   const [collegeFilter, setCollegeFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -182,7 +183,15 @@ export default function Members() {
 
   /* ─── Filtering & Sorting ─── */
   const filtered = participants
-    .filter(p => p.paymentStatus === 'paid' || p.checkedIn)
+    .filter(p => {
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'paid') return p.paymentStatus === 'paid';
+      if (statusFilter === 'submitted') return p.paymentStatus === 'submitted';
+      if (statusFilter === 'unpaid') return !p.paymentStatus || p.paymentStatus === 'unpaid';
+      if (statusFilter === 'rejected') return p.paymentStatus === 'rejected';
+      if (statusFilter === 'checkedIn') return p.checkedIn;
+      return true;
+    })
     .filter(p => collegeFilter === 'all' || p.college === collegeFilter)
     .filter(p => sizeFilter === 'all' || p.tshirtSize === sizeFilter)
     .filter(p => {
@@ -312,6 +321,23 @@ export default function Members() {
             </select>
           </div>
 
+          {/* Payment Status Filter */}
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input select"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{ paddingLeft: 10, paddingRight: 28, minWidth: 160 }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid</option>
+              <option value="submitted">Pending Verification</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="rejected">Rejected</option>
+              <option value="checkedIn">Checked In</option>
+            </select>
+          </div>
+
           {/* Sort */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>SORT BY:</span>
@@ -403,6 +429,48 @@ export default function Members() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {p.paymentStatus === 'submitted' && (
+                        <>
+                          <button
+                            onClick={() => verifyUtr(p.id, 'approve')}
+                            title="Approve Payment"
+                            style={{
+                              background: '#22c55e',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              cursor: 'pointer',
+                              fontSize: 10,
+                              fontWeight: 600
+                            }}
+                          >
+                            <Check size={11} />Approve
+                          </button>
+                          <button
+                            onClick={() => verifyUtr(p.id, 'reject')}
+                            title="Reject Payment"
+                            style={{
+                              background: '#f59e0b',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              cursor: 'pointer',
+                              fontSize: 10,
+                              fontWeight: 600
+                            }}
+                          >
+                            <X size={11} />Reject
+                          </button>
+                        </>
+                      )}
                       <button 
                         className="btn btn-danger btn-sm" 
                         onClick={() => deleteUser(p.id, p.name)}
@@ -511,52 +579,57 @@ export default function Members() {
           )}
         </div>
 
-        {/* SECTION 3: ALL PARTICIPANTS LEDGER */}
-        <div>
-          <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 6, borderBottom: '1px solid #666666', paddingBottom: 3, color: '#000000' }}>
-            Section 3: All Participant Registration Records ({filtered.length})
-          </h2>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: '4%' }}>#</th>
-                <th style={{ width: '13%' }}>Name</th>
-                <th style={{ width: '15%' }}>Email</th>
-                <th style={{ width: '9%' }}>Phone</th>
-                <th style={{ width: '16%' }}>College</th>
-                <th style={{ width: '13%' }}>Branch · Year</th>
-                <th style={{ width: '8%' }}>Team</th>
-                <th style={{ width: '5%' }}>Size</th>
-                <th style={{ width: '6%' }}>Amount</th>
-                <th style={{ width: '5%' }}>Status</th>
-                <th style={{ width: '11%' }}>Payment ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p, idx) => (
-                <tr key={p.id}>
-                  <td style={{ color: '#000000' }}>{idx + 1}</td>
-                  <td style={{ fontWeight: 'bold', color: '#000000' }}>{p.name}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: '8.5px', color: '#000000' }}>{p.email}</td>
-                  <td style={{ color: '#000000' }}>{p.phone}</td>
-                  <td style={{ color: '#000000' }}>{p.college}</td>
-                  <td style={{ color: '#000000' }}>{p.branch} · {p.year}</td>
-                  <td style={{ color: '#000000' }}>{p.teamName || '—'}</td>
-                  <td style={{ color: '#000000' }}>{p.tshirtSize || '—'}</td>
-                  <td style={{ fontWeight: 'bold', fontFamily: 'monospace', color: '#000000' }}>₹{p.amountPaid || p.expectedAmount || 0}</td>
-                  <td>
-                    <span className="print-badge-paid">
-                      {p.paymentStatus || 'paid'}
-                    </span>
-                  </td>
-                  <td className="print-payment-id" style={{ fontFamily: 'monospace', fontSize: '8px' }}>
-                    {p.paymentId || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* SECTION 3: SUCCESSFUL PARTICIPANTS LEDGER */}
+        {(() => {
+          const paidRecords = filtered.filter(p => p.paymentStatus === 'paid' || p.checkedIn);
+          return (
+            <div>
+              <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 6, borderBottom: '1px solid #666666', paddingBottom: 3, color: '#000000' }}>
+                Section 3: Successful Participant Registration Records ({paidRecords.length})
+              </h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: '4%' }}>#</th>
+                    <th style={{ width: '13%' }}>Name</th>
+                    <th style={{ width: '15%' }}>Email</th>
+                    <th style={{ width: '9%' }}>Phone</th>
+                    <th style={{ width: '16%' }}>College</th>
+                    <th style={{ width: '13%' }}>Branch · Year</th>
+                    <th style={{ width: '8%' }}>Team</th>
+                    <th style={{ width: '5%' }}>Size</th>
+                    <th style={{ width: '6%' }}>Amount</th>
+                    <th style={{ width: '5%' }}>Status</th>
+                    <th style={{ width: '11%' }}>Payment ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paidRecords.map((p, idx) => (
+                    <tr key={p.id}>
+                      <td style={{ color: '#000000' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: 'bold', color: '#000000' }}>{p.name}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '8.5px', color: '#000000' }}>{p.email}</td>
+                      <td style={{ color: '#000000' }}>{p.phone}</td>
+                      <td style={{ color: '#000000' }}>{p.college}</td>
+                      <td style={{ color: '#000000' }}>{p.branch} · {p.year}</td>
+                      <td style={{ color: '#000000' }}>{p.teamName || '—'}</td>
+                      <td style={{ color: '#000000' }}>{p.tshirtSize || '—'}</td>
+                      <td style={{ fontWeight: 'bold', fontFamily: 'monospace', color: '#000000' }}>₹{p.amountPaid || p.expectedAmount || 0}</td>
+                      <td>
+                        <span className="print-badge-paid">
+                          {p.paymentStatus || 'paid'}
+                        </span>
+                      </td>
+                      <td className="print-payment-id" style={{ fontFamily: 'monospace', fontSize: '8px' }}>
+                        {p.paymentId || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
