@@ -23,7 +23,7 @@ export default function Dashboard() {
 
   const cards = stats ? [
     { label: 'Total Registrations', value: stats.totalRegistrations ?? 0,   icon: Users,       sub: 'All registered participants' },
-    { label: 'Paid Participants',   value: stats.paidParticipants ?? 0,     icon: CreditCard,  sub: `₹${(stats.totalRevenue ?? 0).toLocaleString()} collected` },
+    { label: 'Paid Participants',   value: stats.paidParticipants ?? 0,     icon: CreditCard,  sub: `₹${((stats.paidParticipants ?? 0) * 399).toLocaleString()} collected` },
     { label: 'Total Teams',         value: stats.totalTeams ?? 0,           icon: GitBranch,   sub: 'Formed event teams' },
     { label: 'Unique Visitors',     value: stats.uniqueVisitorsCount ?? 0,  icon: Globe,       sub: 'Filtered by IP (no duplicate hits)' },
   ] : [];
@@ -188,8 +188,8 @@ export default function Dashboard() {
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 8 }}>Revenue Summary</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                ['Total Revenue',    `₹${(stats.totalRevenue ?? 0).toLocaleString()}`],
-                ['Avg per Team',     stats.totalTeams > 0 ? `₹${Math.round((stats.totalRevenue ?? 0) / stats.totalTeams).toLocaleString()}` : '—'],
+                ['Total Revenue',    `₹${((stats.paidParticipants ?? 0) * 399).toLocaleString()}`],
+                ['Avg per Team',     stats.totalTeams > 0 ? `₹${Math.round(((stats.paidParticipants ?? 0) * 399) / stats.totalTeams).toLocaleString()}` : '—'],
                 ['Pending Payments', stats.totalRegistrations - stats.paidParticipants],
               ].map(([k, v]) => (
 

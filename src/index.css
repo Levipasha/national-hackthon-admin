@@ -750,6 +750,15 @@ tbody td {
     size: A4 landscape;
     margin: 8mm;
   }
+
+  html, body, #root, .app-shell, .main-content, .page-body {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+  }
   
   html, body, #root, div, section, main, article, .layout, .main-content, .page-body, .printable-report {
     background: #ffffff !important;
