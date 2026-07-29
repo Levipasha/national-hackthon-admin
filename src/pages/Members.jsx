@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown, Trash2, Check, X
+  Search, RefreshCw, Download, UserCheck, Filter, FileText, ChevronDown, Trash2, Check, X,
+  UserPlus, Users, Plus, Minus, Pencil
 } from 'lucide-react';
 import { API } from '../api.js';
 
@@ -31,6 +32,10 @@ const normalizeCollegeName = (name) => {
     .join(' ');
 };
 
+const BLANK_INDIVIDUAL = { name: '', email: '', phone: '', college: '', branch: '', year: '', gender: 'Male', paymentStatus: 'paid', amountPaid: 500 };
+const BLANK_MEMBER = { name: '', email: '' };
+const BLANK_TEAM = { teamName: '', college: '', branch: '', year: '', description: '', paymentStatus: 'paid', amountPaid: 500, leader: { name: '', email: '', phone: '' }, members: [{ name: '', email: '' }] };
+
 export default function Members() {
   const { token } = useAuth();
   const [participants, setParticipants] = useState([]);
@@ -44,6 +49,20 @@ export default function Members() {
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState(null);
+
+  // ── Add Registration State ─────────────────────────────
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const [showIndividualModal, setShowIndividualModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [indForm, setIndForm] = useState(BLANK_INDIVIDUAL);
+  const [teamForm, setTeamForm] = useState(BLANK_TEAM);
+  const [submitting, setSubmitting] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // ── Edit User State ────────────────────────────────────
+  const [editUser, setEditUser] = useState(null); // holds the user being edited
+  const [editForm, setEditForm] = useState({});
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const showNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
@@ -159,6 +178,93 @@ export default function Members() {
     } catch (e) { console.error(e); showNotification('Deletion error.', 'error'); }
   };
 
+  /* ─── Add Registration Handlers ─── */
+  const addIndividual = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/admin/add-registration`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'individual', individual: indForm })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShowIndividualModal(false);
+        setIndForm(BLANK_INDIVIDUAL);
+        fetchParticipants();
+        showNotification('Individual participant added successfully!');
+      } else {
+        showNotification(data.message || 'Failed to add participant.', 'error');
+      }
+    } catch (e) { showNotification('Network error.', 'error'); }
+    finally { setSubmitting(false); }
+  };
+
+  const addTeam = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/admin/add-registration`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'team', team: teamForm })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShowTeamModal(false);
+        setTeamForm(BLANK_TEAM);
+        fetchParticipants();
+        showNotification(data.message || 'Team added successfully!');
+      } else {
+        showNotification(data.message || 'Failed to add team.', 'error');
+      }
+    } catch (e) { showNotification('Network error.', 'error'); }
+    finally { setSubmitting(false); }
+  };
+
+  /* ─── Edit User Handlers ─── */
+  const openEdit = (participant) => {
+    setEditUser(participant);
+    setEditForm({
+      name: participant.name || '',
+      email: participant.email || '',
+      phone: participant.phone || '',
+      college: participant.college || '',
+      branch: participant.branch || '',
+      year: participant.year || '',
+      gender: participant.gender || 'Not Specified',
+      linkedin: participant.linkedin || '',
+      paymentStatus: participant.paymentStatus || 'paid',
+      amountPaid: participant.amountPaid ?? 500,
+      role: participant.role || 'participant',
+      tshirtSize: participant.tshirtSize || '',
+      foodPreference: participant.foodPreference || '',
+    });
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    if (!editUser) return;
+    setEditSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/admin/participants/${editUser.id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEditUser(null);
+        fetchParticipants();
+        showNotification(`${data.user?.name || 'User'} updated successfully!`);
+      } else {
+        showNotification(data.message || 'Update failed.', 'error');
+      }
+    } catch (e) { showNotification('Network error.', 'error'); }
+    finally { setEditSubmitting(false); }
+  };
+
   /* ─── Impersonate User / Open Dashboard ─── */
   const impersonateUser = async (userId) => {
     try {
@@ -229,7 +335,8 @@ export default function Members() {
   };
 
   return (
-    <div>
+    <>
+      <div>
       {/* ── Header ── */}
       <div className="section-header">
         <div>
@@ -241,7 +348,7 @@ export default function Members() {
             Review pending student enrollments, manage approvals, and export conference rosters.
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn btn-ghost" onClick={fetchParticipants} disabled={loading}>
             <RefreshCw size={13} />Refresh
           </button>
@@ -251,6 +358,64 @@ export default function Members() {
           <button className="btn btn-ghost" onClick={exportPDF} title="Export PDF" style={{ background: 'rgba(255,255,255,0.05)' }}>
             <FileText size={13} />Export PDF
           </button>
+
+          {/* ── Add Button with Dropdown ── */}
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              onClick={() => setAddDropdownOpen(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                boxShadow: '0 2px 12px rgba(99,102,241,0.35)',
+                transition: 'opacity 0.15s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              <Plus size={13} /> Add
+              <ChevronDown size={11} style={{ marginLeft: 2, transition: 'transform 0.2s', transform: addDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+            </button>
+            {addDropdownOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                background: 'var(--card-bg, #18181b)', border: '1px solid var(--border, #27272a)',
+                borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+                minWidth: 180, zIndex: 9999, overflow: 'hidden'
+              }}>
+                <button
+                  onClick={() => { setAddDropdownOpen(false); setShowIndividualModal(true); }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '11px 16px', background: 'transparent', border: 'none',
+                    color: 'var(--text-primary, #f4f4f5)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    borderBottom: '1px solid var(--border, #27272a)', textAlign: 'left',
+                    transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.12)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <UserPlus size={14} style={{ color: '#6366f1' }} />
+                  Add Individual
+                </button>
+                <button
+                  onClick={() => { setAddDropdownOpen(false); setShowTeamModal(true); }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '11px 16px', background: 'transparent', border: 'none',
+                    color: 'var(--text-primary, #f4f4f5)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    textAlign: 'left', transition: 'background 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.12)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Users size={14} style={{ color: '#8b5cf6' }} />
+                  Add Team
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -471,6 +636,29 @@ export default function Members() {
                           </button>
                         </>
                       )}
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => openEdit(p)}
+                        title="Edit participant"
+                        style={{
+                          background: 'rgba(99,102,241,0.12)',
+                          color: '#818cf8',
+                          border: '1px solid rgba(99,102,241,0.25)',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          transition: 'background 0.15s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.22)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.12)'}
+                      >
+                        <Pencil size={11} />Edit
+                      </button>
                       <button 
                         className="btn btn-danger btn-sm" 
                         onClick={() => deleteUser(p.id, p.name)}
@@ -799,5 +987,396 @@ export default function Members() {
         })()}
       </div>
     </div>
-  );
+
+    {/* ══════════════════════════════════════════════════════
+        EDIT USER MODAL
+    ══════════════════════════════════════════════════════ */}
+    {editUser && (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setEditUser(null); }}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}
+      >
+        <div style={{
+          background: 'var(--card-bg, #18181b)', border: '1px solid var(--border, #27272a)',
+          borderRadius: 16, width: '100%', maxWidth: 600, maxHeight: '92vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '20px 24px', borderBottom: '1px solid var(--border, #27272a)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Pencil size={16} style={{ color: '#6366f1' }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary, #f4f4f5)' }}>Edit Participant</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', fontFamily: 'monospace' }}>{editUser.email}</div>
+              </div>
+            </div>
+            <button onClick={() => setEditUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <form onSubmit={saveEdit} style={{ padding: '24px' }}>
+            {/* Basic Info */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Basic Info</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+              {[
+                ['name',    'Full Name',            'text'],
+                ['email',   'Email Address',         'email'],
+                ['phone',   'Phone Number',          'text'],
+                ['college', 'College / Institution', 'text'],
+                ['branch',  'Branch / Department',  'text'],
+                ['year',    'Year (e.g. 4th Year)',  'text'],
+                ['linkedin','LinkedIn URL',          'url'],
+              ].map(([field, label, type]) => (
+                <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                  <input
+                    type={type}
+                    value={editForm[field]}
+                    onChange={e => setEditForm(f => ({ ...f, [field]: e.target.value }))}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)',
+                      borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)',
+                      fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box'
+                    }}
+                    placeholder={label}
+                  />
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender</label>
+                <select value={editForm.gender} onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                  {['Male','Female','Other','Not Specified'].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Registration / Payment */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Registration & Payment</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Role</label>
+                <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                  {['participant','team-leader','admin'].map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Status</label>
+                <select value={editForm.paymentStatus} onChange={e => setEditForm(f => ({ ...f, paymentStatus: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                  {['paid','pending','submitted','rejected','refunded'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount Paid (₹)</label>
+                <input type="number" min={0} value={editForm.amountPaid} onChange={e => setEditForm(f => ({ ...f, amountPaid: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }} />
+              </div>
+            </div>
+
+            {/* Extras */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Extras</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>T-Shirt Size</label>
+                <select value={editForm.tshirtSize} onChange={e => setEditForm(f => ({ ...f, tshirtSize: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                  <option value="">— Not selected —</option>
+                  {['S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Food Preference</label>
+                <select value={editForm.foodPreference} onChange={e => setEditForm(f => ({ ...f, foodPreference: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                  <option value="">— Not selected —</option>
+                  <option value="Veg">Veg</option>
+                  <option value="Non-Veg">Non-Veg</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setEditUser(null)}
+                style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--border, #27272a)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={editSubmitting}
+                style={{ padding: '9px 22px', borderRadius: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700, opacity: editSubmitting ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Pencil size={12} />{editSubmitting ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* ══════════════════════════════════════════════════════
+        INDIVIDUAL REGISTRATION MODAL
+    ══════════════════════════════════════════════════════ */}
+    {showIndividualModal && (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setShowIndividualModal(false); }}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}
+      >
+        <div style={{
+          background: 'var(--card-bg, #18181b)', border: '1px solid var(--border, #27272a)',
+          borderRadius: 16, width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+        }}>
+          {/* Modal Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '20px 24px', borderBottom: '1px solid var(--border, #27272a)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <UserPlus size={18} style={{ color: '#6366f1' }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary, #f4f4f5)' }}>Add Individual</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted, #71717a)' }}>Register a single participant</div>
+              </div>
+            </div>
+            <button onClick={() => setShowIndividualModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Modal Form */}
+          <form onSubmit={addIndividual} style={{ padding: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              {[['name','Full Name','text',true],['email','Email Address','email',true],['phone','Phone Number','text',false],['college','College / Institution','text',false],['branch','Branch / Department','text',false],['year','Year (e.g. 4th Year)','text',false]]
+                .map(([field, label, type, required]) => (
+                <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {label}{required && <span style={{ color: '#f87171' }}> *</span>}
+                  </label>
+                  <input
+                    required={required}
+                    type={type}
+                    value={indForm[field]}
+                    onChange={e => setIndForm(f => ({ ...f, [field]: e.target.value }))}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)',
+                      borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)',
+                      fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box'
+                    }}
+                    placeholder={label}
+                  />
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gender</label>
+                <select
+                  value={indForm.gender}
+                  onChange={e => setIndForm(f => ({ ...f, gender: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                >
+                  {['Male','Female','Other','Not Specified'].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Status</label>
+                <select
+                  value={indForm.paymentStatus}
+                  onChange={e => setIndForm(f => ({ ...f, paymentStatus: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                >
+                  {['paid','pending','submitted','rejected'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount Paid (₹)</label>
+                <input
+                  type="number" min={0}
+                  value={indForm.amountPaid}
+                  onChange={e => setIndForm(f => ({ ...f, amountPaid: e.target.value }))}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setShowIndividualModal(false)}
+                style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--border, #27272a)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={submitting}
+                style={{ padding: '9px 22px', borderRadius: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
+                {submitting ? 'Saving…' : 'Add Participant'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* ══════════════════════════════════════════════════════
+        TEAM REGISTRATION MODAL
+    ══════════════════════════════════════════════════════ */}
+    {showTeamModal && (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setShowTeamModal(false); }}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}
+      >
+        <div style={{
+          background: 'var(--card-bg, #18181b)', border: '1px solid var(--border, #27272a)',
+          borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '92vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+        }}>
+          {/* Modal Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '20px 24px', borderBottom: '1px solid var(--border, #27272a)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, background: 'rgba(139,92,246,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Users size={18} style={{ color: '#8b5cf6' }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary, #f4f4f5)' }}>Add Team</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted, #71717a)' }}>Register a team with leader and members</div>
+              </div>
+            </div>
+            <button onClick={() => setShowTeamModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <form onSubmit={addTeam} style={{ padding: '24px' }}>
+
+            {/* Team Info */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Team Info</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[['teamName','Team Name',true],['college','College / Institution',false],['branch','Branch / Department',false],['year','Year (e.g. 4th Year)',false]]
+                  .map(([field, label, required]) => (
+                  <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}{required && <span style={{ color: '#f87171' }}> *</span>}</label>
+                    <input
+                      required={required} type="text"
+                      value={teamForm[field]}
+                      onChange={e => setTeamForm(f => ({ ...f, [field]: e.target.value }))}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                      placeholder={label}
+                    />
+                  </div>
+                ))}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Status</label>
+                  <select value={teamForm.paymentStatus} onChange={e => setTeamForm(f => ({ ...f, paymentStatus: e.target.value }))}
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}>
+                    {['paid','pending','submitted','rejected'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Amount Paid per Member (₹)</label>
+                  <input type="number" min={0} value={teamForm.amountPaid} onChange={e => setTeamForm(f => ({ ...f, amountPaid: e.target.value }))}
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Team Leader */}
+            <div style={{ marginBottom: 20, padding: '16px', background: 'rgba(99,102,241,0.06)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>👑 Team Leader</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[['name','Leader Name','text',true],['email','Leader Email','email',true],['phone','Leader Phone','text',false]]
+                  .map(([field, label, type, required]) => (
+                  <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}{required && <span style={{ color: '#f87171' }}> *</span>}</label>
+                    <input required={required} type={type}
+                      value={teamForm.leader[field]}
+                      onChange={e => setTeamForm(f => ({ ...f, leader: { ...f.leader, [field]: e.target.value } }))}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                      placeholder={label} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Members */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>👥 Members ({teamForm.members.length})</div>
+                {teamForm.members.length < 4 && (
+                  <button type="button"
+                    onClick={() => setTeamForm(f => ({ ...f, members: [...f.members, { name: '', email: '' }] }))}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                    <Plus size={11} /> Add Member
+                  </button>
+                )}
+              </div>
+              {teamForm.members.map((mem, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Member {idx+1} Name</label>
+                    <input type="text" value={mem.name}
+                      onChange={e => setTeamForm(f => { const m = [...f.members]; m[idx] = { ...m[idx], name: e.target.value }; return { ...f, members: m }; })}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                      placeholder="Full Name" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #71717a)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Member {idx+1} Email</label>
+                    <input type="email" value={mem.email}
+                      onChange={e => setTeamForm(f => { const m = [...f.members]; m[idx] = { ...m[idx], email: e.target.value }; return { ...f, members: m }; })}
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border, #27272a)', borderRadius: 8, padding: '9px 12px', color: 'var(--text-primary, #f4f4f5)', fontSize: 13 }}
+                      placeholder="Email" />
+                  </div>
+                  <button type="button"
+                    onClick={() => setTeamForm(f => ({ ...f, members: f.members.filter((_, i) => i !== idx) }))}
+                    style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '9px', cursor: 'pointer', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Minus size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setShowTeamModal(false)}
+                style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--border, #27272a)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={submitting}
+                style={{ padding: '9px 22px', borderRadius: 8, background: 'linear-gradient(135deg,#8b5cf6,#6366f1)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
+                {submitting ? 'Saving…' : `Add Team (${teamForm.members.length + 1} member${teamForm.members.length + 1 !== 1 ? 's' : ''})`}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+  </>);
 }

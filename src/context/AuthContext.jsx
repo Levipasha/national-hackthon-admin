@@ -18,7 +18,48 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  // Step 1: Send OTP to email
+  // ── Google Admin Auth — Step 1: sign in with Google, send OTP ────────────────
+  const googleAdminAuth = async () => {
+    // Wait for Firebase to be ready (it loads via CDN module)
+    let attempts = 0;
+    while (!window.__firebaseAuth && attempts < 30) {
+      await new Promise(r => setTimeout(r, 200));
+      attempts++;
+    }
+    if (!window.__firebaseAuth) throw new Error('Firebase failed to load. Please refresh the page.');
+
+    // Trigger Google popup
+    const result = await window.__signInWithPopup(window.__firebaseAuth, window.__googleProvider);
+    const idToken = await result.user.getIdToken();
+
+    // Send to backend — it will check AdminAllowlist and send OTP
+    const res = await fetch(`${API}/api/admin/google-auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Google authentication failed.');
+    return data; // { otpSent, email, maskedEmail, name }
+  };
+
+  // ── Google Admin Auth — Step 2: verify OTP, get JWT ──────────────────────────
+  const verifyAdminOtp = async (email, code) => {
+    const res = await fetch(`${API}/api/admin/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Invalid OTP.');
+    localStorage.setItem('dt_admin_token', data.token);
+    localStorage.setItem('dt_admin_user', JSON.stringify(data.user));
+    setToken(data.token);
+    setAdmin(data.user);
+    return data;
+  };
+
+  // ── Legacy OTP methods (participant side — kept for compatibility) ─────────────
   const sendOtp = async (email) => {
     const res = await fetch(`${API}/api/auth/otp-send`, {
       method: 'POST',
@@ -30,7 +71,6 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  // Step 2: Verify OTP and login
   const verifyOtp = async (email, code) => {
     const res = await fetch(`${API}/api/auth/otp-verify`, {
       method: 'POST',
@@ -47,7 +87,7 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  // Password-only login for local development
+  // ── Legacy password login (kept as fallback) ───────────────────────────────────
   const loginAdmin = async (password) => {
     const res = await fetch(`${API}/api/auth/admin-login`, {
       method: 'POST',
@@ -68,10 +108,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('dt_admin_user');
     setToken(null);
     setAdmin(null);
+    // Also sign out of Firebase
+    if (window.__firebaseAuth) {
+      window.__firebaseAuth.signOut().catch(() => {});
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ admin, token, loading, sendOtp, verifyOtp, loginAdmin, logout }}>
+    <AuthContext.Provider value={{ admin, token, loading, googleAdminAuth, verifyAdminOtp, sendOtp, verifyOtp, loginAdmin, logout }}>
       {children}
     </AuthContext.Provider>
   );
