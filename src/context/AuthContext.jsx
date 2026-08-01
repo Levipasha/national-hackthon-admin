@@ -18,6 +18,18 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
+  // ── Admin Auth — Step 1: Send OTP to email ────────────────────────────────────
+  const sendAdminOtp = async (email) => {
+    const res = await fetch(`${API}/api/admin/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to send OTP code.');
+    return data; // { success, email, maskedEmail, name }
+  };
+
   // ── Google Admin Auth — Step 1: sign in with Google, send OTP ────────────────
   const googleAdminAuth = async () => {
     // Wait for Firebase to be ready (it loads via CDN module)
@@ -115,7 +127,8 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ admin, token, loading, googleAdminAuth, verifyAdminOtp, sendOtp, verifyOtp, loginAdmin, logout }}>
+    <AuthContext.Provider value={{ admin, token, loading, sendAdminOtp, googleAdminAuth, verifyAdminOtp, sendOtp, verifyOtp, loginAdmin, logout }}>
+
       {children}
     </AuthContext.Provider>
   );
