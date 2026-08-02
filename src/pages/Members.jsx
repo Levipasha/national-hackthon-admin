@@ -690,20 +690,6 @@ export default function Members() {
       {/* ── Printable PDF / Print Report Container ── */}
       <div className="printable-report" style={{ background: '#ffffff', color: '#000000', padding: '10px', fontFamily: 'sans-serif' }}>
         {(() => {
-          // Helper to map college names to locations
-          const getCollegeLocation = (collegeName) => {
-            const name = (collegeName || '').toLowerCase().trim();
-            if (name.includes('audisankara')) return 'Nellore';
-            if (name.includes('srm')) return 'Chennai';
-            if (name.includes('narayana')) return 'Nellore';
-            if (name.includes('study world')) return 'Coimbatore';
-            if (name.includes('nbkrist')) return 'Tirupati';
-            if (name.includes('vellore') || name.includes('vit')) return 'Tamil Nadu';
-            if (name.includes('gudlavalleru')) return 'Gudlavalleru';
-            if (name.includes('lbrce') || name.includes('lakireddy')) return 'Mylavaram';
-            return 'Nellore'; // Default or fallback
-          };
-
           // Helper to format date
           const formatDate = (dateStr) => {
             if (!dateStr) return '';
@@ -742,7 +728,6 @@ export default function Members() {
             .sort((a, b) => b[1] - a[1])
             .map(([name, count]) => ({
               name,
-              location: getCollegeLocation(name),
               count
             }));
 
@@ -895,7 +880,6 @@ export default function Members() {
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, textAlign: 'left' }}>College Name</th>
-                    <th style={thStyle}>Location</th>
                     <th style={thStyle}>Student Count</th>
                   </tr>
                 </thead>
@@ -903,12 +887,11 @@ export default function Members() {
                   {collegeRows.map((c, i) => (
                     <tr key={i}>
                       <td style={tdLeftStyle}>{c.name}</td>
-                      <td style={tdStyle}>{c.location}</td>
                       <td style={tdStyle}>{c.count}</td>
                     </tr>
                   ))}
                   <tr style={totalRowStyle}>
-                    <td style={{ ...tdLeftStyle, fontWeight: 'bold' }} colSpan={2}>TOTAL</td>
+                    <td style={{ ...tdLeftStyle, fontWeight: 'bold' }}>TOTAL</td>
                     <td style={{ ...tdStyle, fontWeight: 'bold' }}>{totalStudents}</td>
                   </tr>
                 </tbody>
