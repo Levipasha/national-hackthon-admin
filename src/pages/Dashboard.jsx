@@ -13,9 +13,17 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${targetUrl}/api/admin/stats`, {
+      // Try /api/admin/overview first (to avoid ad-blockers filtering '/stats'), fallback to /api/admin/stats
+      let res = await fetch(`${targetUrl}/api/admin/overview`, {
         headers: { Authorization: `Bearer ${token}` }
-      });
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        res = await fetch(`${targetUrl}/api/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -41,7 +49,7 @@ export default function Dashboard() {
       if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
         try {
           console.log('Local backend unreachable. Trying fallback to https://ap.orderin.in...');
-          const fallbackRes = await fetch(`https://ap.orderin.in/api/admin/stats`, {
+          const fallbackRes = await fetch(`https://ap.orderin.in/api/admin/overview`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (fallbackRes.ok) {
