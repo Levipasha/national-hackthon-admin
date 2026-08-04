@@ -45,29 +45,48 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error('Fetch stats error:', e);
-      // Automatic fallback: if target is local and failed, try production server
-      if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
-        try {
-          console.log('Local backend unreachable. Trying fallback to https://ap.orderin.in...');
-          const fallbackRes = await fetch(`https://ap.orderin.in/api/admin/overview`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (fallbackRes.ok) {
-            const data = await fallbackRes.json();
-            setStats(data);
-            setLoading(false);
-            return;
-          }
-        } catch (fallbackErr) {
-          console.error('Fallback to production API also failed:', fallbackErr);
-        }
+
+      // Diagnostic health ping to check if backend server itself is reachable
+      let serverReachable = false;
+      try {
+        const pingRes = await fetch(`${targetUrl}/`, { method: 'GET', mode: 'cors' }).catch(() => null);
+        if (pingRes && pingRes.ok) serverReachable = true;
+      } catch (pingErr) {
+        // Ping failed
       }
-      setError({
-        title: 'Connection Error (Failed to fetch)',
-        message: `Could not connect to backend API at "${targetUrl}". Ensure your backend server is running and accessible.`,
-        detail: e.message || 'TypeError: Failed to fetch',
-        isAuth: false
-      });
+
+      if (serverReachable) {
+        setError({
+          title: 'Session Expired or Unauthorized',
+          message: `The server at ${targetUrl} is online, but your admin session token is invalid or expired. Please sign out and log back in.`,
+          detail: 'Server health check OK, but API request failed.',
+          isAuth: true
+        });
+      } else {
+        // Automatic fallback: if target is local and failed, try production server
+        if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
+          try {
+            console.log('Local backend unreachable. Trying fallback to https://ap.orderin.in...');
+            const fallbackRes = await fetch(`https://ap.orderin.in/api/admin/overview`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              setStats(data);
+              setLoading(false);
+              return;
+            }
+          } catch (fallbackErr) {
+            console.error('Fallback to production API also failed:', fallbackErr);
+          }
+        }
+        setError({
+          title: 'Connection Error (Failed to fetch)',
+          message: `Could not connect to backend API at "${targetUrl}". Ensure your backend server is running and accessible.`,
+          detail: e.message || 'TypeError: Failed to fetch',
+          isAuth: false
+        });
+      }
     } finally {
       setLoading(false);
     }
