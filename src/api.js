@@ -1,11 +1,11 @@
-// Central API base URL – respects VITE_API_URL if defined, else defaults based on environment
-let baseUrl = import.meta.env.VITE_API_URL || (
-  typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:5000'
-    : 'https://ap.orderin.in'
-);
+// Central API base URL – auto-detects localhost or respects VITE_API_URL
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-// If page is hosted on HTTPS, upgrade http:// to https:// (except localhost) to avoid Mixed Content 'TypeError: Failed to fetch'
+let baseUrl = isLocal
+  ? (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.includes('http') ? import.meta.env.VITE_API_URL : 'http://localhost:5000')
+  : (import.meta.env.VITE_API_URL || 'https://ap.orderin.in');
+
+// If page is hosted on HTTPS, upgrade http:// to https:// (except localhost)
 if (
   typeof window !== 'undefined' &&
   window.location.protocol === 'https:' &&

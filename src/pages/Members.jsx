@@ -84,11 +84,17 @@ export default function Members() {
         const uniqueColleges = [...new Set(data.map(p => normalizeCollegeName(p.college)).filter(Boolean))].sort();
         setColleges(uniqueColleges);
       }
-      const statsRes = await fetch(`${API}/api/admin/stats`, {
+      let statsRes = await fetch(`${API}/api/admin/overview`, {
         headers: { Authorization: `Bearer ${token}` }
-      });
-      if (statsRes.ok) {
-        setStats(await statsRes.json());
+      }).catch(() => null);
+      if (!statsRes || !statsRes.ok) {
+        statsRes = await fetch(`${API}/api/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => null);
+      }
+      if (statsRes && statsRes.ok) {
+        const statsData = await statsRes.json().catch(() => null);
+        if (statsData) setStats(statsData);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
