@@ -1,22 +1,68 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp, Globe, Eye, Monitor } from 'lucide-react';
+import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp, Globe, Eye, Monitor, AlertTriangle, LogOut } from 'lucide-react';
 import { API } from '../api.js';
 
 export default function Dashboard() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const fetchStats = async () => {
+  const fetchStats = async (targetUrl = API) => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${API}/api/admin/stats`, {
+      const res = await fetch(`${targetUrl}/api/admin/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) setStats(await res.json());
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 401 || res.status === 403) {
+          setError({
+            title: 'Authentication Required',
+            message: errData.message || 'Your session token is invalid or expired. Please sign out and log back in.',
+            isAuth: true
+          });
+        } else {
+          setError({
+            title: `Server Error (${res.status})`,
+            message: errData.message || `The server at ${targetUrl} returned an error response.`,
+            isAuth: false
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Fetch stats error:', e);
+      // Automatic fallback: if target is local and failed, try production server
+      if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
+        try {
+          console.log('Local backend unreachable. Trying fallback to https://ap.orderin.in...');
+          const fallbackRes = await fetch(`https://ap.orderin.in/api/admin/stats`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (fallbackRes.ok) {
+            const data = await fallbackRes.json();
+            setStats(data);
+            setLoading(false);
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback to production API also failed:', fallbackErr);
+        }
+      }
+      setError({
+        title: 'Connection Error (Failed to fetch)',
+        message: `Could not connect to backend API at "${targetUrl}". Ensure your backend server is running and accessible.`,
+        detail: e.message || 'TypeError: Failed to fetch',
+        isAuth: false
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { if (token) fetchStats(); }, [token]);
@@ -47,15 +93,50 @@ export default function Dashboard() {
           <div className="section-title">Overview Dashboard</div>
           <div className="section-sub">Live registration & event metrics</div>
         </div>
-        <button className="btn btn-ghost" onClick={fetchStats} disabled={loading}>
+        <button className="btn btn-ghost" onClick={() => fetchStats()} disabled={loading}>
           <RefreshCw size={13} className={loading ? 'spin' : ''} />
           Refresh
         </button>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards / Error State */}
       {loading ? (
         <div className="loading-center"><div className="spinner" /> Loading stats…</div>
+      ) : error ? (
+        <div className="card" style={{ padding: 24, marginBottom: 28, border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+            <div style={{ padding: 10, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', display: 'flex' }}>
+              <AlertTriangle size={24} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#f87171', marginBottom: 4 }}>
+                {error.title}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                {error.message}
+              </div>
+              {error.detail && (
+                <div style={{ fontSize: 11, fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: 6, color: '#fca5a5', marginBottom: 16 }}>
+                  Error detail: {error.detail} (Target URL: {API})
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={() => fetchStats()} style={{ fontSize: 12, padding: '6px 14px' }}>
+                  <RefreshCw size={14} /> Retry Connection
+                </button>
+                {error.isAuth ? (
+                  <button className="btn btn-ghost" onClick={logout} style={{ fontSize: 12, color: '#ef4444' }}>
+                    <LogOut size={14} /> Sign Out & Re-login
+                  </button>
+                ) : (
+                  <button className="btn btn-ghost" onClick={() => fetchStats('https://ap.orderin.in')} style={{ fontSize: 12 }}>
+                    Try Production API (ap.orderin.in)
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 28 }}>
           {cards.map(({ label, value, icon: Icon, sub }) => (
