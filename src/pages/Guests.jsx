@@ -128,10 +128,11 @@ export default function Guests() {
   };
 
   const exportCSV = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const headers = ['Name', 'Designation', 'Topic', 'Email', 'Phone', 'Status', 'VIP'];
     const csvContent = [
       headers.join(','),
-      ...guests.map(g => [g.name, g.designation, g.topic, g.email, g.phone, g.status, g.vip ? 'Yes' : 'No'].map(v => `"${v}"`).join(','))
+      ...guests.map(g => [esc(g.name), esc(g.designation), esc(g.topic), esc(g.email), esc(g.phone), esc(g.status), esc(g.vip ? 'Yes' : 'No')].join(','))
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

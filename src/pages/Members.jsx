@@ -108,18 +108,87 @@ export default function Members() {
   }, [token, search, fetchParticipants]);
 
   /* ─── Export CSV ─── */
-  const exportCSV = () => {
-    fetch(`${API}/api/admin/export-csv`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `registrations_report_${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showNotification('CSV Exported successfully!');
+  const exportCSV = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/export-csv`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Server error ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `registrations_report_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showNotification('CSV Exported successfully!');
+    } catch (e) {
+      console.error('Export CSV error:', e);
+      // Fallback: Client-side generation from participants array if API fails
+      if (participants && participants.length > 0) {
+        try {
+          const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+          let maleCount = 0;
+          let femaleCount = 0;
+          let otherGenderCount = 0;
+          participants.forEach(p => {
+            const g = (p.gender || '').toLowerCase().trim();
+            if (g === 'male' || g === 'm') maleCount++;
+            else if (g === 'female' || g === 'f') femaleCount++;
+            else otherGenderCount++;
+          });
+          const totalP = participants.length;
+          const malePct = totalP ? ((maleCount / totalP) * 100).toFixed(1) : '0';
+          const femalePct = totalP ? ((femaleCount / totalP) * 100).toFixed(1) : '0';
+          const otherPct = totalP ? ((otherGenderCount / totalP) * 100).toFixed(1) : '0';
+
+          const headers = ['ID', 'Name', 'Email', 'Phone', 'College', 'Branch', 'Year', 'Gender', 'TshirtSize', 'TeamName', 'PaymentStatus', 'AmountPaid', 'RegistrationDate'];
+          const rows = participants.map(p => [
+            esc(p.id), esc(p.name), esc(p.email), esc(p.phone), esc(p.college),
+            esc(p.branch), esc(p.year), esc(p.gender), esc(p.tshirtSize),
+            esc(p.teamName || ''), esc(p.paymentStatus), esc(p.amountPaid ?? 0), esc(p.createdAt)
+          ].join(','));
+
+          const summaryLines = [
+            `================================================================================`,
+            `CODESPRINT 2026 — REGISTRATION REPORT`,
+            `Total Registrations: ${totalP}`,
+            `Male Participants: ${maleCount} (${malePct}%)`,
+            `Female Participants: ${femaleCount} (${femalePct}%)`,
+            `Other / Unspecified: ${otherGenderCount} (${otherPct}%)`,
+            `================================================================================\n`,
+            `=== GENDER DEMOGRAPHICS BREAKDOWN ===`,
+            `Gender,Student Count,Percentage`,
+            `Male,${maleCount},${malePct}%`,
+            `Female,${femaleCount},${femalePct}%`,
+            `Other / Unspecified,${otherGenderCount},${otherPct}%\n`,
+            `=== PARTICIPANT RECORDS ===`,
+            headers.join(','),
+            ...rows
+          ].join('\n');
+
+          const blob = new Blob([summaryLines], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `registrations_report_${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showNotification('CSV Exported successfully (from current view)!');
+          return;
+        } catch (clientErr) {
+          console.error('Client CSV export error:', clientErr);
+        }
+      }
+      showNotification(e.message || 'Failed to export CSV.', 'error');
+    }
   };
 
   /* ─── Export PDF (print) ─── */
@@ -704,10 +773,17 @@ export default function Members() {
             return `${parts[2]}-${parts[1]}-${parts[0]}`;
           };
 
+          const safeGetDateKey = (val) => {
+            if (!val) return 'Unknown';
+            if (typeof val === 'string') return val.split('T')[0] || val;
+            if (val instanceof Date) return val.toISOString().split('T')[0];
+            try { return new Date(val).toISOString().split('T')[0]; } catch (e) { return 'Unknown'; }
+          };
+
           // 1. Calculate Daily Stats
           const dailyMap = {};
           filtered.forEach(p => {
-            const dateKey = p.createdAt ? p.createdAt.split('T')[0] : 'Unknown';
+            const dateKey = safeGetDateKey(p.createdAt);
             if (dateKey === 'Unknown') return;
             if (!dailyMap[dateKey]) {
               dailyMap[dateKey] = { students: 0, teams: 0 };
@@ -742,6 +818,17 @@ export default function Members() {
           const yearCounts = years.map(y => {
             const count = filtered.filter(p => (p.year || '').toLowerCase().includes(y.toLowerCase())).length;
             return { label: y, count };
+          });
+
+          // 4. Calculate Gender Stats
+          let maleCount = 0;
+          let femaleCount = 0;
+          let otherGenderCount = 0;
+          filtered.forEach(p => {
+            const g = (p.gender || '').toLowerCase().trim();
+            if (g === 'male' || g === 'm') maleCount++;
+            else if (g === 'female' || g === 'f') femaleCount++;
+            else otherGenderCount++;
           });
 
           // Style definitions
@@ -787,6 +874,14 @@ export default function Members() {
                 <div style={{ color: '#002080', fontSize: '12px', fontWeight: 'bold', textAlign: 'right', marginTop: '6px', paddingRight: '5px' }}>
                   Audisankara (Deemed to be University)
                 </div>
+              </div>
+
+              {/* Demographics Metrics Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-around', padding: '10px 16px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>
+                <span>Total Registrations: {totalStudents}</span>
+                <span style={{ color: '#2563eb' }}>Male: {maleCount} ({totalStudents ? ((maleCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                <span style={{ color: '#ec4899' }}>Female: {femaleCount} ({totalStudents ? ((femaleCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                {otherGenderCount > 0 && <span>Other / Unspecified: {otherGenderCount}</span>}
               </div>
 
               {/* Bar Chart Container */}
@@ -903,23 +998,59 @@ export default function Members() {
                 </tbody>
               </table>
 
-              {/* Table 3: Year-wise breakdown */}
-              <table style={{ ...tableStyle, width: '50%' }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Year wise Registration</th>
-                    <th style={thStyle}>Student Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {yearCounts.map((y, i) => (
-                    <tr key={i}>
-                      <td style={tdStyle}>{y.label}</td>
-                      <td style={tdStyle}>{y.count}</td>
+              {/* Tables 3 & 4: Year-wise & Gender Demographics Breakdown */}
+              <div style={{ display: 'flex', gap: '20px', width: '100%', marginBottom: '20px' }}>
+                <table style={{ ...tableStyle, flex: 1, marginBottom: 0, marginTop: 0 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Year wise Registration</th>
+                      <th style={thStyle}>Student Count</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {yearCounts.map((y, i) => (
+                      <tr key={i}>
+                        <td style={tdStyle}>{y.label}</td>
+                        <td style={tdStyle}>{y.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <table style={{ ...tableStyle, flex: 1, marginBottom: 0, marginTop: 0 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Gender Breakdown</th>
+                      <th style={thStyle}>Student Count</th>
+                      <th style={thStyle}>Percentage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={tdStyle}>Male</td>
+                      <td style={tdStyle}>{maleCount}</td>
+                      <td style={tdStyle}>{totalStudents ? ((maleCount / totalStudents) * 100).toFixed(1) : 0}%</td>
+                    </tr>
+                    <tr>
+                      <td style={tdStyle}>Female</td>
+                      <td style={tdStyle}>{femaleCount}</td>
+                      <td style={tdStyle}>{totalStudents ? ((femaleCount / totalStudents) * 100).toFixed(1) : 0}%</td>
+                    </tr>
+                    {otherGenderCount > 0 && (
+                      <tr>
+                        <td style={tdStyle}>Other / Unspecified</td>
+                        <td style={tdStyle}>{otherGenderCount}</td>
+                        <td style={tdStyle}>{totalStudents ? ((otherGenderCount / totalStudents) * 100).toFixed(1) : 0}%</td>
+                      </tr>
+                    )}
+                    <tr style={totalRowStyle}>
+                      <td style={{ ...tdStyle, fontWeight: 'bold' }}>TOTAL</td>
+                      <td style={{ ...tdStyle, fontWeight: 'bold' }}>{totalStudents}</td>
+                      <td style={{ ...tdStyle, fontWeight: 'bold' }}>100%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
               {/* SECTION 4: PARTICIPANTS LEDGER (ALL INDIVIDUAL RECORDS) */}
               <h2 style={{ fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', marginTop: '30px', marginBottom: '6px', borderBottom: '1px solid #666666', paddingBottom: '3px', color: '#000000' }}>
