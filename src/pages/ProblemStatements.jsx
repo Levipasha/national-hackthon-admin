@@ -8,7 +8,7 @@ export default function ProblemStatements() {
   const [problems, setProblems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', visibleFrom: '', visibleTo: '' });
+  const [form, setForm] = useState({ title: '', description: '', industry: '', sno: '', visibleFrom: '', visibleTo: '' });
   
   const [showDistribute, setShowDistribute] = useState(false);
   const [distributeMode, setDistributeMode] = useState('all');
@@ -40,10 +40,10 @@ export default function ProblemStatements() {
   };
 
   const downloadDemoCsv = () => {
-    const csvData = `Title,Description,VisibleFrom,VisibleTo
-Smart Traffic Management,Develop an AI system to optimize traffic lights.,2026-08-01T09:00:00Z,2026-08-02T09:00:00Z
-Healthcare Chatbot,Build a chatbot for preliminary diagnosis.,,
-E-Waste Classifier,Create an image classifier for e-waste.,,
+    const csvData = `SNo,Problem Statement,Description,Industry
+1,Smart Traffic Management,Develop an AI system to optimize traffic lights.,Smart Cities & Transport
+2,Healthcare Chatbot,Build a chatbot for preliminary diagnosis.,Healthcare & AI
+3,E-Waste Classifier,Create an image classifier for e-waste.,Sustainability
 `;
     const blob = new Blob([csvData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -139,10 +139,10 @@ E-Waste Classifier,Create an image classifier for e-waste.,,
       // Format dates for datetime-local input
       const from = p.visibleFrom ? new Date(p.visibleFrom).toISOString().slice(0, 16) : '';
       const to = p.visibleTo ? new Date(p.visibleTo).toISOString().slice(0, 16) : '';
-      setForm({ title: p.title, description: p.description, visibleFrom: from, visibleTo: to });
+      setForm({ title: p.title || '', description: p.description || '', industry: p.industry || '', sno: p.sno || '', visibleFrom: from, visibleTo: to });
     } else {
       setEditingId(null);
-      setForm({ title: '', description: '', visibleFrom: '', visibleTo: '' });
+      setForm({ title: '', description: '', industry: '', sno: '', visibleFrom: '', visibleTo: '' });
     }
     setShowForm(true);
   };
@@ -282,9 +282,19 @@ E-Waste Classifier,Create an image classifier for e-waste.,,
             {editingId ? 'Edit Problem Statement' : 'Add Problem Statement'}
           </div>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 14 }}>
+              <div className="input-group">
+                <label className="label">S.No</label>
+                <input className="input" value={form.sno} onChange={e => setForm({...form, sno: e.target.value})} placeholder="e.g. 1" />
+              </div>
+              <div className="input-group">
+                <label className="label">Title / Problem Statement</label>
+                <input required className="input" value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="e.g. Smart Traffic Management" />
+              </div>
+            </div>
             <div className="input-group">
-              <label className="label">Title</label>
-              <input required className="input" value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="e.g. Smart Traffic Management" />
+              <label className="label">Industry / Sector</label>
+              <input className="input" value={form.industry} onChange={e => setForm({...form, industry: e.target.value})} placeholder="e.g. Smart Cities & Transport, Healthcare & AI" />
             </div>
             <div className="input-group">
               <label className="label">Description / Details</label>
@@ -338,9 +348,19 @@ E-Waste Classifier,Create an image classifier for e-waste.,,
                 <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}><Trash2 size={14} /></button>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                {p.sno && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--surface-hover)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                    #{p.sno}
+                  </span>
+                )}
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{p.title}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: `${sColor}15`, color: sColor }}>
+                {p.industry && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 12, background: 'rgba(147, 51, 234, 0.12)', color: '#c084fc', border: '1px solid rgba(147, 51, 234, 0.25)' }}>
+                    {p.industry}
+                  </span>
+                )}
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: `${sColor}15`, color: sColor, marginLeft: 'auto', marginRight: 50 }}>
                   {status}
                 </div>
               </div>

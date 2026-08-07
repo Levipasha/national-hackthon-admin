@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext.jsx';
 import {
   LayoutDashboard, CalendarClock, Ticket,
   LogOut, Shield, Radio, Sparkles, UserCheck,
-  Award, Settings, ClipboardList, Users, School, Target
+  Award, Settings, ClipboardList, Users, School, Target, Mail
 } from 'lucide-react';
 
 const navItems = [
   { to: '/',             icon: LayoutDashboard, label: 'Analytics Dashboard' },
   { to: '/registrations',icon: ClipboardList,   label: 'Registrations' },
+  { to: '/bulk-mails',   icon: Mail,            label: 'Bulk Mails' },
   { to: '/problems',     icon: Target,          label: 'Problem Statements' },
   { to: '/broadcast',    icon: Radio,           label: 'WS Broadcast' },
   { to: '/highlights',   icon: Sparkles,        label: 'Highlights Manager' },

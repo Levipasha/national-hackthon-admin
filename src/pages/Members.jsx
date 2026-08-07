@@ -79,9 +79,10 @@ export default function Members() {
       );
       if (res.ok) {
         const data = await res.json();
-        setParticipants(data);
+        const cleanData = (Array.isArray(data) ? data : []).filter(p => p && !p.hidden && p.email?.toLowerCase() !== 'vamshi.c2002@gmail.com');
+        setParticipants(cleanData);
         // Derive unique normalized colleges
-        const uniqueColleges = [...new Set(data.map(p => normalizeCollegeName(p.college)).filter(Boolean))].sort();
+        const uniqueColleges = [...new Set(cleanData.map(p => normalizeCollegeName(p.college)).filter(Boolean))].sort();
         setColleges(uniqueColleges);
       }
       let statsRes = await fetch(`${API}/api/admin/overview`, {

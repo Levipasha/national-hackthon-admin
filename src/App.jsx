@@ -14,10 +14,12 @@ import Coordinators from './pages/Coordinators.jsx';
 import Profile from './pages/Profile.jsx';
 import Colleges from './pages/Colleges.jsx';
 import ProblemStatements from './pages/ProblemStatements.jsx';
+import BulkMails from './pages/BulkMails.jsx';
 
 const PAGE_TITLES = {
   '/':             { title: 'Analytics Dashboard',  sub: 'Live registration stats & analytics' },
   '/registrations':{ title: 'Registrations Ledger',  sub: 'Review pending student enrollments and manage approvals' },
+  '/bulk-mails':   { title: 'Bulk Mails',            sub: 'Broadcast WhatsApp Community invitations & track student logs' },
   '/broadcast':    { title: 'WS Broadcast',          sub: 'Dispatch real-time notifications to all attendees' },
   '/highlights':   { title: 'Highlights Manager',    sub: 'Manage event highlights and media' },
   '/guests':       { title: 'Guests Manager',        sub: 'Manage guest speakers and VIP attendees' },
@@ -62,6 +64,7 @@ function ProtectedLayout() {
           <Routes>
             <Route path="/"             element={<Dashboard />} />
             <Route path="/registrations"element={<Members />} />
+            <Route path="/bulk-mails"   element={<BulkMails />} />
             <Route path="/broadcast"    element={<Broadcast />} />
             <Route path="/highlights"   element={<Highlights />} />
             <Route path="/guests"       element={<Guests />} />

@@ -1,13 +1,71 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp, Globe, Eye, Monitor, AlertTriangle, LogOut } from 'lucide-react';
+import { Users, CreditCard, UserCheck, GitBranch, RefreshCw, TrendingUp, Globe, Eye, Monitor, AlertTriangle, LogOut, Mail, Send, CheckCircle2, X } from 'lucide-react';
 import { API } from '../api.js';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { token, logout } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Bulk Email Campaign state
+  const [showBulkMailModal, setShowBulkMailModal] = useState(false);
+  const [campaignState, setCampaignState] = useState(null);
+  const [triggeringBulkMail, setTriggeringBulkMail] = useState(false);
+  const [forceResend, setForceResend] = useState(false);
+  const [bulkMailNotice, setBulkMailNotice] = useState(null);
+
+  const fetchCampaignStatus = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/campaign/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCampaignState(data.campaignStatus);
+      }
+    } catch (err) {
+      console.error('Failed to fetch campaign status:', err);
+    }
+  };
+
+  const handleStartBulkMail = async () => {
+    setTriggeringBulkMail(true);
+    setBulkMailNotice(null);
+    try {
+      const res = await fetch(`${API}/api/admin/campaign/send-whatsapp-bulk`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ force: forceResend })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBulkMailNotice({ type: 'success', text: data.message });
+        setCampaignState(data.campaignStatus);
+      } else {
+        setBulkMailNotice({ type: 'error', text: data.message || 'Failed to start bulk mail campaign.' });
+      }
+    } catch (err) {
+      setBulkMailNotice({ type: 'error', text: 'Network error starting campaign.' });
+    } finally {
+      setTriggeringBulkMail(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+    if (showBulkMailModal || (campaignState && campaignState.inProgress)) {
+      fetchCampaignStatus();
+      interval = setInterval(fetchCampaignStatus, 2000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [showBulkMailModal, campaignState?.inProgress]);
 
   const fetchStats = async (targetUrl = API) => {
     setLoading(true);
@@ -121,15 +179,37 @@ export default function Dashboard() {
   return (
     <div>
       {/* Header */}
-      <div className="section-header">
+      <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div className="section-title">Overview Dashboard</div>
           <div className="section-sub">Live registration & event metrics</div>
         </div>
-        <button className="btn btn-ghost" onClick={() => fetchStats()} disabled={loading}>
-          <RefreshCw size={13} className={loading ? 'spin' : ''} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate('/bulk-mails')}
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 600,
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              borderRadius: 8,
+              cursor: 'pointer'
+            }}
+          >
+            <Mail size={14} />
+            Bulk Mails Page
+          </button>
+          <button className="btn btn-ghost" onClick={() => fetchStats()} disabled={loading}>
+            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stat Cards / Error State */}
@@ -327,6 +407,181 @@ export default function Dashboard() {
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: typeof v === 'string' ? 'JetBrains Mono, monospace' : 'inherit' }}>{v}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Bulk Mails Confirmation & Progress Modal */}
+      {showBulkMailModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 20
+        }}>
+          <div className="card" style={{
+            maxWidth: 580, width: '100%', background: '#121318', border: '1px solid var(--border)',
+            borderRadius: 16, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.6)', position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowBulkMailModal(false)}
+              style={{
+                position: 'absolute', top: 16, right: 16, background: 'none', border: 'none',
+                color: 'var(--text-muted)', cursor: 'pointer'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                padding: 10, borderRadius: 12, background: 'rgba(16, 185, 129, 0.15)',
+                color: '#10b981', display: 'flex'
+              }}>
+                <Mail size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Send WhatsApp Group Bulk Mails
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Broadcast official WhatsApp Community link to all registered participants
+                </div>
+              </div>
+            </div>
+
+            {bulkMailNotice && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, marginBottom: 16,
+                background: bulkMailNotice.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: bulkMailNotice.type === 'success' ? 'var(--success)' : 'var(--danger)',
+                border: `1px solid ${bulkMailNotice.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                display: 'flex', gap: 8, alignItems: 'center'
+              }}>
+                {bulkMailNotice.type === 'success' && <CheckCircle2 size={14} />}
+                {bulkMailNotice.text}
+              </div>
+            )}
+
+            {/* Template / Target Details */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: 16, marginBottom: 20, border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Target Audience:</span>
+                <span style={{ fontWeight: 700, color: '#10b981' }}>
+                  {stats?.totalRegistrations ?? 'All'} Registered Participants
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Daily Usage Quota:</span>
+                <span style={{
+                  fontWeight: 700,
+                  color: (campaignState?.runsToday >= 2) ? '#ef4444' : '#10b981',
+                  fontFamily: 'JetBrains Mono, monospace'
+                }}>
+                  {campaignState?.runsToday ?? 0} / 2 Dispatches Used Today
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Email Subject:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  [Action Required] Join Official CodeSprint 2026 WhatsApp Group
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>WhatsApp Group Link:</span>
+                <a
+                  href="https://chat.whatsapp.com/IA1BaLQ7gpu46RrbEz7mN7"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 12, color: '#10b981', textDecoration: 'underline', wordBreak: 'break-all', fontFamily: 'monospace' }}
+                >
+                  https://chat.whatsapp.com/IA1BaLQ7gpu46RrbEz7mN7
+                </a>
+              </div>
+            </div>
+
+            {/* Daily Limit Warning Banner */}
+            {campaignState && campaignState.runsToday >= 2 && !campaignState.inProgress && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, marginBottom: 20,
+                background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)',
+                display: 'flex', gap: 8, alignItems: 'center'
+              }}>
+                <AlertTriangle size={16} />
+                Daily Bulk Email Limit Reached (2/2 dispatches used today). Try again tomorrow.
+              </div>
+            )}
+
+            {/* Campaign Live Status Progress */}
+            {campaignState && (campaignState.inProgress || campaignState.totalCount > 0) && (
+              <div style={{ marginBottom: 20, padding: 16, borderRadius: 10, background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {campaignState.inProgress ? <RefreshCw size={14} className="spin" /> : <CheckCircle2 size={14} />}
+                    {campaignState.inProgress ? 'Sending Bulk Emails...' : 'Campaign Completed'}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {campaignState.sentCount} / {campaignState.totalCount} ({Math.round(((campaignState.sentCount || 0) / (campaignState.totalCount || 1)) * 100)}%)
+                  </div>
+                </div>
+
+                <div className="progress-bar" style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.1)' }}>
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${Math.round(((campaignState.sentCount || 0) / (campaignState.totalCount || 1)) * 100)}%`,
+                      background: 'linear-gradient(90deg, #10b981, #059669)',
+                      height: '100%', borderRadius: 4, transition: 'width 0.3s ease'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                  <span>Sent: {campaignState.sentCount}</span>
+                  <span>Failed: {campaignState.failedCount}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Force Re-send option */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <input
+                type="checkbox"
+                id="forceResend"
+                checked={forceResend}
+                onChange={e => setForceResend(e.target.checked)}
+                disabled={campaignState?.inProgress || triggeringBulkMail || campaignState?.runsToday >= 2}
+                style={{ cursor: 'pointer' }}
+              />
+              <label htmlFor="forceResend" style={{ fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                Force re-send to participants who have already received this email
+              </label>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowBulkMailModal(false)}
+                disabled={triggeringBulkMail}
+              >
+                Close
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleStartBulkMail}
+                disabled={triggeringBulkMail || campaignState?.inProgress || campaignState?.runsToday >= 2}
+                style={{
+                  background: (campaignState?.runsToday >= 2) ? 'var(--bg-hover)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: (campaignState?.runsToday >= 2) ? 'var(--text-muted)' : '#ffffff',
+                  border: 'none', fontWeight: 600, gap: 6,
+                  cursor: (campaignState?.runsToday >= 2) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Send size={14} />
+                {triggeringBulkMail ? 'Starting...' : campaignState?.inProgress ? 'Sending in Progress...' : (campaignState?.runsToday >= 2) ? 'Limit Reached (2/2)' : 'Start Bulk Mail Dispatch'}
+              </button>
             </div>
           </div>
         </div>
