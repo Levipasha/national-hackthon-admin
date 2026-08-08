@@ -488,17 +488,6 @@ export default function Dashboard() {
                   [Action Required] Join Official CodeSprint 2026 WhatsApp Group
                 </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>WhatsApp Group Link:</span>
-                <a
-                  href="https://chat.whatsapp.com/IA1BaLQ7gpu46RrbEz7mN7"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: 12, color: '#10b981', textDecoration: 'underline', wordBreak: 'break-all', fontFamily: 'monospace' }}
-                >
-                  https://chat.whatsapp.com/IA1BaLQ7gpu46RrbEz7mN7
-                </a>
-              </div>
             </div>
 
             {/* Daily Limit Warning Banner */}

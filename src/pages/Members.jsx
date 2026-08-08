@@ -64,6 +64,49 @@ export default function Members() {
   const [editForm, setEditForm] = useState({});
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  // ── Edit Problem SNO State ─────────────────────────────
+  const [snoModalUser, setSnoModalUser] = useState(null);
+  const [snoInputValue, setSnoInputValue] = useState('');
+  const [snoSubmitting, setSnoSubmitting] = useState(false);
+
+  const openSnoModal = (userItem) => {
+    setSnoModalUser(userItem);
+    setSnoInputValue(userItem.problemSno || '');
+  };
+
+  const handleSaveAdminSno = async (e) => {
+    e.preventDefault();
+    if (!snoModalUser) return;
+    if (!snoModalUser.teamId) {
+      showNotification('User does not belong to a team yet', 'error');
+      return;
+    }
+    setSnoSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/admin/teams/${snoModalUser.teamId}/problem-sno`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ problemSno: snoInputValue.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showNotification(data.message || 'Problem SNO updated successfully!');
+        setSnoModalUser(null);
+        fetchParticipants();
+      } else {
+        showNotification(data.message || 'Failed to update Problem SNO', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification('Network error while updating Problem SNO', 'error');
+    } finally {
+      setSnoSubmitting(false);
+    }
+  };
+
   const showNotification = (msg, type = 'success') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 3000);
@@ -620,6 +663,7 @@ export default function Members() {
                 <th>College</th>
                 <th>Branch · Year</th>
                 <th>Team</th>
+                <th>Problem SNO</th>
                 <th>T-Shirt</th>
                 <th>Amount</th>
                 <th>Status</th>
@@ -655,6 +699,43 @@ export default function Members() {
                     {p.teamName
                       ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-secondary)' }}>{p.teamName}</span>
                       : <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {p.problemSno ? (
+                        <span style={{
+                          background: 'rgba(168,85,247,0.15)',
+                          color: '#a78bfa',
+                          border: '1px solid rgba(168,85,247,0.3)',
+                          borderRadius: 6,
+                          padding: '2px 8px',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          fontFamily: 'JetBrains Mono, monospace'
+                        }}>
+                          #{p.problemSno}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>—</span>
+                      )}
+                      {p.teamId && (
+                        <button
+                          onClick={() => openSnoModal(p)}
+                          title="Edit Problem Statement SNO"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: 2,
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td>{sizeBadge(p.tshirtSize)}</td>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace' }}>
@@ -1493,6 +1574,97 @@ export default function Members() {
               <button type="submit" disabled={submitting}
                 style={{ padding: '9px 22px', borderRadius: 8, background: 'linear-gradient(135deg,#8b5cf6,#6366f1)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700, opacity: submitting ? 0.7 : 1 }}>
                 {submitting ? 'Saving…' : `Add Team (${teamForm.members.length + 1} member${teamForm.members.length + 1 !== 1 ? 's' : ''})`}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+    {/* ══════════════════════════════════════════════════════
+        EDIT PROBLEM STATEMENT SNO MODAL
+    ══════════════════════════════════════════════════════ */}
+    {snoModalUser && (
+      <div
+        onClick={e => { if (e.target === e.currentTarget) setSnoModalUser(null); }}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}
+      >
+        <div style={{
+          background: 'var(--card-bg, #18181b)', border: '1px solid var(--border, #27272a)',
+          borderRadius: 16, width: '100%', maxWidth: 440, padding: 24,
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>
+              Edit Problem SNO
+            </div>
+            <button onClick={() => setSnoModalUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+            Update the Problem Statement Serial Number for team <strong style={{ color: 'var(--text-primary)' }}>{snoModalUser.teamName || snoModalUser.name}</strong>.
+          </p>
+
+          <form onSubmit={handleSaveAdminSno} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Problem Statement SNO
+              </label>
+              <input
+                type="text"
+                value={snoInputValue}
+                onChange={e => setSnoInputValue(e.target.value)}
+                placeholder="Enter SNO (e.g. 1, 2, 3, PS-05...)"
+                required
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border, #27272a)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => setSnoModalUser(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border, #27272a)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={snoSubmitting}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: 8,
+                  background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  opacity: snoSubmitting ? 0.7 : 1
+                }}
+              >
+                {snoSubmitting ? 'Saving...' : 'Save Problem SNO'}
               </button>
             </div>
           </form>
